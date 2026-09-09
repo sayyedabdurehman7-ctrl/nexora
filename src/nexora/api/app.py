@@ -7,6 +7,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from nexora.config import Settings
@@ -27,9 +28,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         service.store.engine.dispose()
 
     app = FastAPI(title="NEXORA (mock, Phase 1)", lifespan=lifespan)
-    app.add_middleware(
-        TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"]
-    )
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"])
 
     @app.middleware("http")
     async def correlation(request: Request, call_next):
@@ -73,9 +72,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(RequestValidationError)
     async def invalid(request, exc):
-        return error(
-            request, 422, "INVALID_INPUT", "Provide a non-empty goal up to 2000 characters."
-        )
+        return error(request, 422, "INVALID_INPUT", "Provide a non-empty goal up to 2000 characters.")
 
     @app.exception_handler(Exception)
     async def unexpected(request, exc):
@@ -135,13 +132,37 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         service = request.app.state.service
         return service.registry.metadata(service.settings.tool_timeout_seconds)
 
+    class MemoryInput(BaseModel):
+        category: str = Field(min_length=1, max_length=40)
+        content: str = Field(min_length=1, max_length=5000)
+        enabled: bool = True
+
+    @app.get("/api/v1/memory")
+    async def memory_list(request: Request, include_disabled: bool = False):
+        return request.app.state.service.store.memory_list(include_disabled)
+
+    @app.post("/api/v1/memory", status_code=201)
+    async def memory_create(body: MemoryInput, request: Request):
+        return request.app.state.service.store.memory_save(
+            str(uuid4()), body.category, body.content, enabled=body.enabled
+        )
+
+    @app.patch("/api/v1/memory/{memory_id}")
+    async def memory_update(memory_id: str, body: MemoryInput, request: Request):
+        existing = request.app.state.service.store.memory_get(memory_id)
+        return request.app.state.service.store.memory_save(
+            memory_id, body.category, body.content, source=existing["source"], enabled=body.enabled
+        )
+
+    @app.delete("/api/v1/memory/{memory_id}", status_code=204)
+    async def memory_delete(memory_id: str, request: Request):
+        request.app.state.service.store.memory_delete(memory_id)
+
     return app
 
 
 def main() -> None:
-    uvicorn.run(
-        "nexora.api.app:create_app", factory=True, host="127.0.0.1", port=8000, access_log=False
-    )
+    uvicorn.run("nexora.api.app:create_app", factory=True, host="127.0.0.1", port=8000, access_log=False)
 
 
 if __name__ == "__main__":

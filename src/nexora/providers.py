@@ -51,6 +51,18 @@ class MockLLMProvider:
                     {"action": "search", "path": path, "query": query},
                     "matched lines",
                 )
+            elif lower.startswith("research "):
+                tool, inputs, expected = (
+                    "research",
+                    {"query": command[9:].strip()},
+                    "source title and URL",
+                )
+            elif lower.startswith("summarize pdf "):
+                tool, inputs, expected = (
+                    "pdf",
+                    {"path": command[14:].strip()},
+                    "page count and extracted text",
+                )
             elif lower == "approval demo" and len(goal.split(" then ")) == 1:
                 tool, inputs, expected = (
                     "approval_demo",
@@ -70,3 +82,29 @@ class MockLLMProvider:
             )
             steps.append(step)
         return steps
+
+
+class OpenAIProvider:
+    """Optional adapter loaded only when an API key is explicitly configured."""
+
+    def __init__(self, api_key: str, model: str):
+        self.api_key, self.model = api_key, model
+
+    def classify_goal(self, goal: str) -> RequestType:
+        raise NotImplementedError("OpenAI structured adapter is scheduled after local MVP verification")
+
+    def create_plan(self, goal: str) -> list[PlanStep]:
+        raise NotImplementedError("OpenAI structured adapter is scheduled after local MVP verification")
+
+
+class OllamaProvider:
+    """Optional local adapter placeholder with an explicit safe failure."""
+
+    def __init__(self, model: str, host: str = "http://127.0.0.1:11434"):
+        self.model, self.host = model, host
+
+    def classify_goal(self, goal: str) -> RequestType:
+        raise NotImplementedError("Ollama structured adapter is scheduled after local MVP verification")
+
+    def create_plan(self, goal: str) -> list[PlanStep]:
+        raise NotImplementedError("Ollama structured adapter is scheduled after local MVP verification")

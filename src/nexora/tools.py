@@ -4,6 +4,7 @@ import ast
 import hashlib
 import math
 import operator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, Protocol
 
@@ -144,9 +145,7 @@ class Files:
                 },
             )
         if path.suffix.lower() not in self.suffixes:
-            raise ToolError(
-                "TYPE_DENIED", "Only .txt, .md, .csv, .json and .log files are supported."
-            )
+            raise ToolError("TYPE_DENIED", "Only .txt, .md, .csv, .json and .log files are supported.")
         with path.open("rb") as handle:
             raw = handle.read(self.max_bytes + 1)
         if len(raw) > self.max_bytes:
@@ -179,6 +178,99 @@ class Files:
     async def verify(self, inputs: FileInput, result: ToolResult) -> bool:
         fresh = self.snapshot(inputs)
         return result.success and fresh.data == result.data and fresh.evidence == result.evidence
+
+
+class PDFInput(StrictModel):
+    path: str = Field(min_length=1, max_length=500, strict=True)
+
+
+class PDFReader:
+    name = "pdf"
+    input_model = PDFInput
+    risk = Risk.LOW
+
+    def __init__(self, workspace: Path):
+        self.workspace = workspace.resolve()
+
+    def resolve(self, relative: str) -> Path:
+        path = Path(relative)
+        if path.is_absolute() or ".." in path.parts or ":" in relative:
+            raise ToolError("PATH_DENIED", "Only relative PDF paths inside the workspace are allowed.")
+        resolved = (self.workspace / path).resolve()
+        if not resolved.is_relative_to(self.workspace) or resolved.suffix.lower() != ".pdf":
+            raise ToolError("PDF_DENIED", "Only approved local PDF files are supported.")
+        return resolved
+
+    async def execute(self, inputs: PDFInput) -> ToolResult:
+        path = self.resolve(inputs.path)
+        try:
+            from pypdf import PdfReader
+        except ImportError as exc:
+            raise ToolError(
+                "PDF_DEPENDENCY_MISSING",
+                "Install the optional PDF dependency with: pip install -e '.[mvp]'",
+            ) from exc
+        try:
+            reader = PdfReader(str(path))
+            text = "\n\n".join((page.extract_text() or "") for page in reader.pages)
+            metadata = {str(key).lstrip("/"): str(value) for key, value in (reader.metadata or {}).items()}
+            raw = path.read_bytes()
+            return ToolResult(
+                success=True,
+                data={"text": text, "metadata": metadata, "page_count": len(reader.pages)},
+                evidence={
+                    "path": str(path),
+                    "bytes": len(raw),
+                    "sha256": hashlib.sha256(raw).hexdigest(),
+                    "page_count": len(reader.pages),
+                    "extracted_chars": len(text),
+                    "retrieved_at": datetime.now(UTC).isoformat(),
+                },
+            )
+        except (OSError, ValueError, IndexError) as exc:
+            raise ToolError("PDF_READ_FAILED", "The approved PDF could not be read safely.") from exc
+
+    async def verify(self, inputs: PDFInput, result: ToolResult) -> bool:
+        fresh = await self.execute(inputs)
+        return (
+            result.success
+            and fresh.data == result.data
+            and all(
+                fresh.evidence.get(key) == result.evidence.get(key)
+                for key in ("path", "bytes", "sha256", "page_count", "extracted_chars")
+            )
+        )
+
+
+class ResearchInput(StrictModel):
+    query: str = Field(min_length=2, max_length=300, strict=True)
+
+
+class MockResearch:
+    name = "research"
+    input_model = ResearchInput
+    risk = Risk.LOW
+
+    async def execute(self, inputs: ResearchInput) -> ToolResult:
+        retrieved = datetime.now(UTC).isoformat()
+        source = {
+            "title": f"Mock research overview: {inputs.query}",
+            "url": "mock://nexora/research",
+            "retrieved_at": retrieved,
+            "claim": f"This is deterministic placeholder evidence for: {inputs.query}.",
+        }
+        return ToolResult(
+            success=True,
+            data={"summary": source["claim"], "sources": [source]},
+            evidence={"source_count": 1, "sources": [source]},
+        )
+
+    async def verify(self, inputs: ResearchInput, result: ToolResult) -> bool:
+        return (
+            result.success
+            and len(result.data.get("sources", [])) > 0
+            and all(source.get("url", "").startswith("mock://") for source in result.data["sources"])
+        )
 
 
 class Registry:

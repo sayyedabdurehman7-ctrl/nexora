@@ -45,9 +45,7 @@ def approval_dialog(app, task: dict) -> ft.AlertDialog:
         actions=[
             ft.TextButton("Cancel task", on_click=cancel),
             ft.TextButton("Reject", on_click=reject),
-            ft.Button(
-                "Approve exact action", on_click=approve, disabled=approval["risk"] == "critical"
-            ),
+            ft.Button("Approve exact action", on_click=approve, disabled=approval["risk"] == "critical"),
         ],
         actions_alignment=ft.MainAxisAlignment.END,
     )

@@ -26,7 +26,7 @@ def test_api_offline_vertical_slice(settings):
         assert task["status"] == "COMPLETED"
         assert task["plan"]["steps"][0]["result"]["data"]["value"] == 21
         assert client.get(f"/api/v1/tasks/{task_id}/events").json()
-        assert len(client.get("/api/v1/tools").json()) == 2
+        assert len(client.get("/api/v1/tools").json()) == 4
     with TestClient(create_app(settings)) as client:
         assert client.get("/api/v1/tasks").json()[0]["id"] == task_id
 

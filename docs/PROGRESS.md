@@ -64,3 +64,20 @@ syntax checked; interactive desktop launch remains unverified.
 sourced mock/real research, and explicit SQLite memory CRUD/disable/export. Complete memory
 and settings UI, optional provider support, security/error hardening and corresponding tests.
 Keep mock default. Do not begin browser, voice, screen or evaluation phases yet.
+
+## Phase 2 checkpoint
+
+Added PDF Reader and deterministic Mock Research tools with source/evidence records, plus
+SQLite Memory CRUD endpoints (`GET`, `POST`, `PATCH`, `DELETE`). Mock remains the default;
+OpenAI/Ollama providers remain configuration-roadmap items until credential handling and
+structured provider adapters are implemented and tested. UI catalog pages expose these
+capabilities honestly, with unavailable actions marked Coming Soon.
+
+Verification: Ruff passed and the full suite is **72 passed, 1 skipped**. The skipped
+symlink test still requires Windows symlink privileges. Phase 2's PDF path validation,
+mock research evidence, memory CRUD/disable/delete behavior, and planner commands have
+focused tests. The PDF extractor reports a clear missing-dependency message until the
+optional `mvp` group is installed. OpenAI and Ollama configuration schemas and safe
+adapter boundaries are present; actual provider calls remain intentionally deferred until
+credentials and structured-output tests are added. No cloud calls or fabricated sources
+were used.

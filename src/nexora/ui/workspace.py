@@ -19,9 +19,7 @@ from nexora.ui.theme import PRIMARY, badge, coming, palette
 
 
 class Workspace:
-    def __init__(
-        self, page: ft.Page, client: APIClient | None = None, state: UIState | None = None
-    ):
+    def __init__(self, page: ft.Page, client: APIClient | None = None, state: UIState | None = None):
         self.page, self.client, self.state = page, client or APIClient(), state or UIState()
         self.state.load_preferences()
         self.root = ft.Container(expand=True)
@@ -81,9 +79,7 @@ class Workspace:
         width, height = self.page.width or 1400, self.page.height or 900
         compact = self.state.collapsed or width < 1050 or height < 680
         title = (
-            self.state.task["user_text"][:45]
-            if self.state.task and self.state.screen == "Chat"
-            else self.state.screen
+            self.state.task["user_text"][:45] if self.state.task and self.state.screen == "Chat" else self.state.screen
         )
         top = ft.Row(
             [
@@ -100,9 +96,7 @@ class Workspace:
                     ],
                     expand=True,
                 ),
-                badge("Safe Mode", "#268365")
-                if width > 700
-                else ft.Icon(ft.Icons.SHIELD_OUTLINED, color="#268365"),
+                badge("Safe Mode", "#268365") if width > 700 else ft.Icon(ft.Icons.SHIELD_OUTLINED, color="#268365"),
                 ft.Icon(
                     ft.Icons.CIRCLE,
                     size=8,
@@ -123,15 +117,9 @@ class Workspace:
                     tooltip="More options",
                     items=[
                         ft.PopupMenuItem(content=ft.Text("Quick guide"), on_click=self.help_dialog),
-                        ft.PopupMenuItem(
-                            content=ft.Text("Refresh connection"), on_click=self.reconnect
-                        ),
-                        ft.PopupMenuItem(
-                            content=ft.Text("Rename conversation · Coming Soon"), disabled=True
-                        ),
-                        ft.PopupMenuItem(
-                            content=ft.Text("Delete conversation · Coming Soon"), disabled=True
-                        ),
+                        ft.PopupMenuItem(content=ft.Text("Refresh connection"), on_click=self.reconnect),
+                        ft.PopupMenuItem(content=ft.Text("Rename conversation · Coming Soon"), disabled=True),
+                        ft.PopupMenuItem(content=ft.Text("Delete conversation · Coming Soon"), disabled=True),
                     ],
                 ),
             ],
@@ -184,9 +172,7 @@ class Workspace:
                     border=ft.Border.only(left=ft.BorderSide(1, colors["border"])),
                 )
             )
-        self.root.content = ft.Row(
-            columns, expand=True, spacing=0, vertical_alignment=ft.CrossAxisAlignment.STRETCH
-        )
+        self.root.content = ft.Row(columns, expand=True, spacing=0, vertical_alignment=ft.CrossAxisAlignment.STRETCH)
         self.page.update()
 
     async def refresh(self) -> None:
@@ -235,9 +221,7 @@ class Workspace:
             await self.refresh()
         except (httpx.HTTPError, ValueError) as exc:
             self.error = (
-                str(exc)
-                if isinstance(exc, ValueError)
-                else "Connection lost. Your goal is still in the composer."
+                str(exc) if isinstance(exc, ValueError) else "Connection lost. Your goal is still in the composer."
             )
         finally:
             self.state.busy = False
@@ -253,28 +237,20 @@ class Workspace:
 
     def maybe_approve(self, task: dict) -> None:
         approval = task.get("approval")
-        if (
-            approval
-            and approval["status"] == "pending"
-            and approval["id"] not in self.shown_approvals
-        ):
+        if approval and approval["status"] == "pending" and approval["id"] not in self.shown_approvals:
             self.shown_approvals.add(approval["id"])
             self.page.show_dialog(approval_dialog(self, task))
 
     async def decide(self, approval_id: str, approve: bool, task_id: str) -> None:
         try:
-            await self.client.request(
-                "POST", f"/api/v1/approvals/{approval_id}/{'approve' if approve else 'reject'}"
-            )
+            await self.client.request("POST", f"/api/v1/approvals/{approval_id}/{'approve' if approve else 'reject'}")
             if approve:
                 await self.client.request("POST", f"/api/v1/tasks/{task_id}/run")
             await self.load_task(task_id)
             self.notify("Action approved." if approve else "Action rejected. No action taken.")
         except (httpx.HTTPError, ValueError):
             self.shown_approvals.discard(approval_id)
-            self.error = (
-                "Approval was not confirmed. Reconnect and reopen the task to check its status."
-            )
+            self.error = "Approval was not confirmed. Reconnect and reopen the task to check its status."
         self.render()
 
     async def stop_task(self, task_id: str) -> None:
@@ -439,9 +415,7 @@ class Workspace:
                             ft.Text("2. Press Enter or Run. Safe steps run automatically."),
                             ft.Text("3. Inspect Plan, Activity and Evidence in the task panel."),
                             ft.Text("4. Approve exact actions when asked, or choose Stop."),
-                            ft.Text(
-                                "Try: calculate 2 + 3\nlist files\nread notes.txt\napproval demo"
-                            ),
+                            ft.Text("Try: calculate 2 + 3\nlist files\nread notes.txt\napproval demo"),
                             ft.Text("Join with ' then '. Each goal is a separate saved task."),
                             ft.Text("Full guide: docs/SETUP.md in the NEXORA project folder."),
                         ],
@@ -481,9 +455,7 @@ class Workspace:
                             ft.Row([coming("OpenAI"), coming("Ollama")], wrap=True),
                             ft.Text("2 · Approved workspace", weight=ft.FontWeight.W_600),
                             ft.Text(
-                                self.state.settings.get(
-                                    "workspace", "Connect to load this setting."
-                                ),
+                                self.state.settings.get("workspace", "Connect to load this setting."),
                                 selectable=True,
                             ),
                             coming("Choose folder"),

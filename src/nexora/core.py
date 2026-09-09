@@ -20,7 +20,7 @@ from nexora.models import (
 )
 from nexora.policies import approval_binding, risk_decision, transition
 from nexora.providers import LLMProvider, MockLLMProvider
-from nexora.tools import Calculator, Files, Registry, ToolError
+from nexora.tools import Calculator, Files, MockResearch, PDFReader, Registry, ToolError
 
 
 class Conflict(Exception):
@@ -34,6 +34,8 @@ class Service:
         self.registry = Registry()
         self.registry.register(Calculator())
         self.registry.register(Files(settings.nexora_workspace_dir))
+        self.registry.register(PDFReader(settings.nexora_workspace_dir))
+        self.registry.register(MockResearch())
         self.running: dict[str, asyncio.Task] = {}
         self.stop_flags: dict[str, asyncio.Event] = {}
 
@@ -88,9 +90,7 @@ class Service:
         task = self.store.get(task_id)
         if task_id in self.running or task.status not in {Status.PLANNED, Status.AWAITING_APPROVAL}:
             raise Conflict("Task cannot run in its current state.")
-        risk = max(
-            (step.risk_level for step in task.plan.steps), key=lambda value: list(Risk).index(value)
-        )
+        risk = max((step.risk_level for step in task.plan.steps), key=lambda value: list(Risk).index(value))
         decision = risk_decision(risk)
         if decision == "block":
             raise Conflict("Critical actions are blocked.")
@@ -122,11 +122,7 @@ class Service:
 
     def decide(self, approval_id: str, approve: bool) -> TaskRun:
         task = next(
-            (
-                task
-                for task in self.store.list()
-                if task.approval and task.approval.id == approval_id
-            ),
+            (task for task in self.store.list() if task.approval and task.approval.id == approval_id),
             None,
         )
         if task is None:
@@ -177,9 +173,7 @@ class Service:
         action = asyncio.create_task(awaitable)
         cancelled = asyncio.create_task(stop.wait())
         try:
-            done, _ = await asyncio.wait(
-                {action, cancelled}, timeout=timeout, return_when=asyncio.FIRST_COMPLETED
-            )
+            done, _ = await asyncio.wait({action, cancelled}, timeout=timeout, return_when=asyncio.FIRST_COMPLETED)
             if cancelled in done:
                 raise asyncio.CancelledError
             if action not in done:
@@ -258,9 +252,7 @@ class Service:
                         )
                         if not recoverable or attempt >= step.max_retries:
                             step.status = Status.FAILED
-                            raise ToolError(
-                                code, "Step failed safely; see step error code."
-                            ) from None
+                            raise ToolError(code, "Step failed safely; see step error code.") from None
                         transition(task, Status.RECOVERING)
                         step.retry_count += 1
                         self.store.save(task, "Transient failure; bounded retry")

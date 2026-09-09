@@ -15,14 +15,10 @@ def settings(app) -> ft.Control:
                 [
                     ft.Text("AI provider", size=19, weight=ft.FontWeight.W_600),
                     badge("Mock · selected · no API key"),
-                    ft.Text(
-                        "Model: deterministic commands. General questions are not supported yet."
-                    ),
+                    ft.Text("Model: deterministic commands. General questions are not supported yet."),
                     ft.Row(
                         [
-                            ft.Button(
-                                "Test connection", icon=ft.Icons.WIFI, on_click=app.reconnect
-                            ),
+                            ft.Button("Test connection", icon=ft.Icons.WIFI, on_click=app.reconnect),
                             coming("OpenAI"),
                             coming("Ollama"),
                         ],

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import Integer, String, Text, create_engine, select
+from sqlalchemy import Boolean, Integer, String, Text, create_engine, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from nexora.models import TaskRun, now
@@ -29,6 +29,17 @@ class AuditRecord(Base):
     status: Mapped[str] = mapped_column(String)
     message: Mapped[str] = mapped_column(String)
     correlation_id: Mapped[str] = mapped_column(String)
+
+
+class MemoryRecord(Base):
+    __tablename__ = "memories"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    category: Mapped[str] = mapped_column(String)
+    content: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String, default="user")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[str] = mapped_column(String)
+    updated_at: Mapped[str] = mapped_column(String)
 
 
 class Store:
@@ -62,10 +73,7 @@ class Store:
 
     def list(self) -> list[TaskRun]:
         with Session(self.engine) as session:
-            tasks = [
-                TaskRun.model_validate_json(row.snapshot)
-                for row in session.scalars(select(TaskRecord))
-            ]
+            tasks = [TaskRun.model_validate_json(row.snapshot) for row in session.scalars(select(TaskRecord))]
         return sorted(tasks, key=lambda task: task.created_at, reverse=True)
 
     def events(self, task_id: str) -> list[dict]:
@@ -80,8 +88,60 @@ class Store:
                     "correlation_id": row.correlation_id,
                 }
                 for row in session.scalars(
-                    select(AuditRecord)
-                    .where(AuditRecord.task_id == task_id)
-                    .order_by(AuditRecord.id)
+                    select(AuditRecord).where(AuditRecord.task_id == task_id).order_by(AuditRecord.id)
                 )
             ]
+
+    def memory_list(self, include_disabled: bool = False) -> list[dict]:
+        with Session(self.engine) as session:
+            query = select(MemoryRecord).order_by(MemoryRecord.updated_at.desc())
+            if not include_disabled:
+                query = query.where(MemoryRecord.enabled.is_(True))
+            return [self._memory_dict(row) for row in session.scalars(query)]
+
+    def memory_get(self, memory_id: str) -> dict:
+        with Session(self.engine) as session:
+            row = session.get(MemoryRecord, memory_id)
+            if row is None:
+                raise KeyError(memory_id)
+            return self._memory_dict(row)
+
+    def memory_save(
+        self,
+        memory_id: str,
+        category: str,
+        content: str,
+        source: str = "user",
+        enabled: bool = True,
+    ) -> dict:
+        stamp = now().isoformat()
+        with Session(self.engine) as session, session.begin():
+            row = session.get(MemoryRecord, memory_id) or MemoryRecord(id=memory_id, created_at=stamp)
+            row.category, row.content, row.source, row.enabled, row.updated_at = (
+                category,
+                content,
+                source,
+                enabled,
+                stamp,
+            )
+            session.add(row)
+        return self.memory_get(memory_id)
+
+    def memory_delete(self, memory_id: str) -> None:
+        with Session(self.engine) as session, session.begin():
+            row = session.get(MemoryRecord, memory_id)
+            if row is None:
+                raise KeyError(memory_id)
+            session.delete(row)
+
+    @staticmethod
+    def _memory_dict(row: MemoryRecord) -> dict:
+        return {
+            "id": row.id,
+            "category": row.category,
+            "content": row.content,
+            "source": row.source,
+            "enabled": row.enabled,
+            "created_at": row.created_at,
+            "updated_at": row.updated_at,
+        }

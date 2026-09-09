@@ -35,9 +35,7 @@ def unavailable(app, name: str) -> ft.Control:
                 color=app.colors["muted"],
             ),
             ft.TextField(label="Search memories · Coming Soon", disabled=True),
-            ft.Text(
-                "Planned categories: Project · Preference · Workflow · Decision · Pending task"
-            ),
+            ft.Text("Planned categories: Project · Preference · Workflow · Decision · Pending task"),
         ]
     controls.append(ft.Row([coming(action) for action in actions], wrap=True))
     return ft.ListView(controls, spacing=18, expand=True)
@@ -65,9 +63,7 @@ def files(app) -> ft.Control:
                     ft.Column(
                         [
                             ft.Text(path, selectable=True, weight=ft.FontWeight.W_600),
-                            ft.Text(
-                                f"{timestamp(task.get('ended_at'))} · {evidence['bytes']} bytes"
-                            ),
+                            ft.Text(f"{timestamp(task.get('ended_at'))} · {evidence['bytes']} bytes"),
                             badge("Processed file · existing workspace"),
                             ft.Text(
                                 "Recorded evidence; the file may have changed since this run.",
@@ -75,9 +71,7 @@ def files(app) -> ft.Control:
                             ),
                             ft.Row(
                                 [
-                                    ft.TextButton(
-                                        "View saved result", on_click=app.open_handler(task["id"])
-                                    ),
+                                    ft.TextButton("View saved result", on_click=app.open_handler(task["id"])),
                                     coming("Open file"),
                                     coming("Show in folder"),
                                     coming("Export"),
@@ -141,9 +135,7 @@ def tools(app) -> ft.Control:
                         ),
                         ft.Text(purpose),
                         ft.Text(
-                            "Local · Low risk"
-                            if enabled
-                            else "Provider and risk available after integration",
+                            "Local · Low risk" if enabled else "Provider and risk available after integration",
                             size=12,
                         ),
                         ft.Row(
@@ -164,9 +156,7 @@ def tools(app) -> ft.Control:
         )
     controls += [
         ft.Text("On the roadmap", size=18),
-        ft.Text(
-            "Browser Automation · Voice · Screen Understanding · Image Creation · Video Creation"
-        ),
+        ft.Text("Browser Automation · Voice · Screen Understanding · Image Creation · Video Creation"),
         badge("Coming Soon"),
     ]
     return ft.ListView(controls, expand=True, spacing=16)

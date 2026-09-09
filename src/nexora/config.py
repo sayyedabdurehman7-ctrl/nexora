@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr = SecretStr("")
     openai_model: str = ""
     ollama_model: str = ""
+    ollama_host: str = "http://127.0.0.1:11434"
     search_provider: Literal["mock"] = "mock"
     database_url: str = "sqlite:///data/nexora.db"
     nexora_workspace_dir: Path = Path("data/user_files")
@@ -26,12 +27,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_supported(self):
-        if self.llm_provider == "openai" and (
-            not self.openai_api_key.get_secret_value() or not self.openai_model
-        ):
+        if self.llm_provider == "openai" and (not self.openai_api_key.get_secret_value() or not self.openai_model):
             raise ValueError("OpenAI requires OPENAI_API_KEY and OPENAI_MODEL in local .env")
-        if self.llm_provider != "mock":
-            raise ValueError("Phase 1 supports LLM_PROVIDER=mock only; cloud/local AI comes later")
+        if self.llm_provider == "ollama" and not self.ollama_model:
+            raise ValueError("Ollama requires OLLAMA_MODEL in local .env")
         if not self.nexora_safe_mode:
             raise ValueError("Phase 1 requires NEXORA_SAFE_MODE=true")
         if not self.database_url.startswith("sqlite:///"):

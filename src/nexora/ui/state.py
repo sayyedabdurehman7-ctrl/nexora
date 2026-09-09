@@ -35,11 +35,7 @@ def duration(task: dict) -> str:
     if not task.get("started_at"):
         return "—"
     start = datetime.fromisoformat(task["started_at"])
-    end = (
-        datetime.fromisoformat(task["ended_at"])
-        if task.get("ended_at")
-        else datetime.now(start.tzinfo)
-    )
+    end = datetime.fromisoformat(task["ended_at"]) if task.get("ended_at") else datetime.now(start.tzinfo)
     return f"{(end - start).total_seconds():.1f}s"
 
 
@@ -51,30 +47,20 @@ def response_text(task: dict) -> str:
             continue
         data = result["data"]
         if not result["success"]:
-            parts.append(
-                f"**{step['selected_tool'].title()}**: {result.get('safe_error', 'Failed')}"
-            )
+            parts.append(f"**{step['selected_tool'].title()}**: {result.get('safe_error', 'Failed')}")
         elif "value" in data:
             parts.append(f"### Result: {data['value']:g}")
         elif "text" in data:
             parts.append("### File contents\n\n" + data["text"][:12000])
         elif "entries" in data:
-            parts.append(
-                "### Files\n\n"
-                + ("\n".join(f"- {x}" for x in data["entries"]) or "No files found.")
-            )
+            parts.append("### Files\n\n" + ("\n".join(f"- {x}" for x in data["entries"]) or "No files found."))
         elif "matches" in data:
             parts.append(
                 "### Matching lines\n\n"
-                + (
-                    "\n".join(f"- Line {x['line']}: {x['text']}" for x in data["matches"])
-                    or "No matches found."
-                )
+                + ("\n".join(f"- Line {x['line']}: {x['text']}" for x in data["matches"]) or "No matches found.")
             )
         elif "acknowledged" in data:
-            parts.append(
-                "The approval demonstration was acknowledged. No external action was taken."
-            )
+            parts.append("The approval demonstration was acknowledged. No external action was taken.")
     return "\n\n".join(parts)
 
 

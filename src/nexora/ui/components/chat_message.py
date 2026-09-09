@@ -20,15 +20,9 @@ def messages(app, task: dict) -> list[ft.Control]:
         bgcolor=colors["accent"],
     )
     actions = [
-        ft.IconButton(
-            ft.Icons.COPY_OUTLINED, tooltip="Copy response", on_click=app.copy_handler(text)
-        ),
-        ft.IconButton(
-            ft.Icons.THUMB_UP_OUTLINED, disabled=True, tooltip="Save feedback · Coming Soon"
-        ),
-        ft.IconButton(
-            ft.Icons.THUMB_DOWN_OUTLINED, disabled=True, tooltip="Save feedback · Coming Soon"
-        ),
+        ft.IconButton(ft.Icons.COPY_OUTLINED, tooltip="Copy response", on_click=app.copy_handler(text)),
+        ft.IconButton(ft.Icons.THUMB_UP_OUTLINED, disabled=True, tooltip="Save feedback · Coming Soon"),
+        ft.IconButton(ft.Icons.THUMB_DOWN_OUTLINED, disabled=True, tooltip="Save feedback · Coming Soon"),
     ]
     if task["status"] in TERMINAL:
         actions.append(

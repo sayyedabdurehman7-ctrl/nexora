@@ -43,9 +43,7 @@ def sidebar(app, compact: bool) -> ft.Control:
             ft.Container(
                 ft.IconButton(icon, tooltip=name, on_click=app.navigate_handler(name))
                 if compact
-                else ft.TextButton(
-                    name, icon=icon, on_click=app.navigate_handler(name), tooltip=name, width=218
-                ),
+                else ft.TextButton(name, icon=icon, on_click=app.navigate_handler(name), tooltip=name, width=218),
                 bgcolor=colors["accent"] if state.screen == name else None,
                 border_radius=10,
             )

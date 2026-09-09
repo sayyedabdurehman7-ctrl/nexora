@@ -53,9 +53,7 @@ def task_panel(app) -> ft.Control:
                                 ]
                             ),
                             ft.Text(step["description"]),
-                            ft.Text(
-                                f"Tool: {step['selected_tool']}", size=12, color=colors["muted"]
-                            ),
+                            ft.Text(f"Tool: {step['selected_tool']}", size=12, color=colors["muted"]),
                             ft.Row(
                                 [
                                     badge(
@@ -109,11 +107,7 @@ def task_panel(app) -> ft.Control:
                     ft.Text(key.replace("_", " ").title(), size=11, color=colors["muted"]),
                     ft.Text(str(value), selectable=True, size=12),
                 ]
-            rows.append(
-                ft.Text(
-                    "Completed " + timestamp(task.get("ended_at")), size=10, color=colors["muted"]
-                )
-            )
+            rows.append(ft.Text("Completed " + timestamp(task.get("ended_at")), size=10, color=colors["muted"]))
             content.append(card(ft.Column(rows), colors))
         if not content:
             content = [ft.Text("No evidence yet. Results appear only after a tool runs.")]
@@ -137,9 +131,7 @@ def task_panel(app) -> ft.Control:
             ft.Row(
                 [
                     ft.Text("TASK INTELLIGENCE", size=11, weight=ft.FontWeight.BOLD, expand=True),
-                    ft.IconButton(
-                        ft.Icons.CLOSE, tooltip="Hide task panel", on_click=app.close_panel
-                    ),
+                    ft.IconButton(ft.Icons.CLOSE, tooltip="Hide task panel", on_click=app.close_panel),
                 ]
             ),
             tabs,

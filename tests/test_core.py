@@ -18,16 +18,12 @@ async def finish(service, task_id):
     return service.store.get(task_id)
 
 
-@pytest.mark.parametrize(
-    ("expression", "value"), [("2+3*4", 14), ("(2+3)/2", 2.5), ("-2**2", -4), ("10%3", 1)]
-)
+@pytest.mark.parametrize(("expression", "value"), [("2+3*4", 14), ("(2+3)/2", 2.5), ("-2**2", -4), ("10%3", 1)])
 def test_calculator(expression, value):
     assert calculate(expression) == value
 
 
-@pytest.mark.parametrize(
-    "expression", ["__import__('os')", "True", "2**999", "1/0", "[1]", "1e999", "(-1)**0.5"]
-)
+@pytest.mark.parametrize("expression", ["__import__('os')", "True", "2**999", "1/0", "[1]", "1e999", "(-1)**0.5"])
 def test_reject_unsafe_arithmetic(expression):
     with pytest.raises(ToolError):
         calculate(expression)

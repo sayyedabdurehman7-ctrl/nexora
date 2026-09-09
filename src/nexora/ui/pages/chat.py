@@ -56,12 +56,8 @@ def chat(app) -> ft.Control:
             ft.ResponsiveRow(cards, spacing=12, run_spacing=12),
             ft.Row(
                 [
-                    ft.TextButton(
-                        "Try a calculation", on_click=app.suggestion_handler("calculate 2 + 3 * 4")
-                    ),
-                    ft.TextButton(
-                        "Explore approval", on_click=app.suggestion_handler("approval demo")
-                    ),
+                    ft.TextButton("Try a calculation", on_click=app.suggestion_handler("calculate 2 + 3 * 4")),
+                    ft.TextButton("Explore approval", on_click=app.suggestion_handler("approval demo")),
                 ],
                 wrap=True,
             ),

@@ -14,12 +14,8 @@ def composer(app) -> ft.Control:
                 app.goal,
                 ft.Row(
                     [
-                        ft.IconButton(
-                            ft.Icons.ATTACH_FILE, disabled=True, tooltip="Attach file · Coming Soon"
-                        ),
-                        ft.IconButton(
-                            ft.Icons.MIC_NONE, disabled=True, tooltip="Voice · Coming Soon"
-                        ),
+                        ft.IconButton(ft.Icons.ATTACH_FILE, disabled=True, tooltip="Attach file · Coming Soon"),
+                        ft.IconButton(ft.Icons.MIC_NONE, disabled=True, tooltip="Voice · Coming Soon"),
                         ft.TextButton(
                             "Tools",
                             icon=ft.Icons.TUNE,

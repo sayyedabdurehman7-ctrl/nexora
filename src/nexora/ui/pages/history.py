@@ -40,8 +40,7 @@ def history(app) -> ft.Control:
                                 badge(label(task["status"])),
                                 ft.Text(timestamp(task["created_at"]), size=12),
                                 ft.Text(
-                                    f"{duration(task)} · {len(task['plan']['steps'])} steps"
-                                    f" · {task['provider']}",
+                                    f"{duration(task)} · {len(task['plan']['steps'])} steps · {task['provider']}",
                                     size=12,
                                 ),
                             ],
@@ -49,9 +48,7 @@ def history(app) -> ft.Control:
                         ),
                         ft.Row(
                             [
-                                ft.TextButton(
-                                    "Open details", on_click=app.open_handler(task["id"])
-                                ),
+                                ft.TextButton("Open details", on_click=app.open_handler(task["id"])),
                                 ft.TextButton("Run again", on_click=app.retry_handler(task)),
                                 coming("Delete history"),
                             ],
