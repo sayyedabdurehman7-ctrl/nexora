@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nexora"
+version = "0.1.0"
+description = "An explainable, local, deterministic personal agent prototype"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115,<1", "uvicorn>=0.30,<1", "pydantic>=2.10,<3",
+  "pydantic-settings>=2.7,<3", "sqlalchemy>=2.0,<3", "httpx>=0.28,<1",
+  "python-dotenv>=1,<2", "flet>=0.80,<0.90",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "pytest-asyncio>=0.25,<2", "ruff>=0.9,<1"]
+mvp = ["pypdf>=5,<7", "openai>=2,<3", "keyring>=25,<26", "alembic>=1.14,<2"]
+browser = ["playwright>=1.50,<2"]
+voice = ["sounddevice>=0.5,<1", "faster-whisper>=1,<2", "pyttsx3>=2,<3"]
+retrieval = ["chromadb>=1,<2"]
+
+[project.scripts]
+nexora-api = "nexora.api.app:main"
+nexora-ui = "nexora.ui.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
