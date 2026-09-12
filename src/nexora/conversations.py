@@ -102,6 +102,10 @@ class ConversationService:
 
     def make_provider(self, name: str) -> LLMProvider:
         config = self.tasks.settings
+        if config.nexora_build_profile == "developer" and config.llm_provider == "gemini":
+            from nexora.providers import FallbackProvider, GeminiProvider
+
+            return FallbackProvider(GeminiProvider(config.gemini_api_key.get_secret_value(), config.gemini_model))
         return NexoraServiceProvider(
             config.nexora_service_url,
             config.nexora_service_token.get_secret_value(),

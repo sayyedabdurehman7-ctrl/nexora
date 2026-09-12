@@ -1,0 +1,5 @@
+NEXORA v1.0.1 Personal testing build
+
+- Gemini can be configured locally for temporary testing.
+- The API key is not bundled; add it only to the per-user NEXORA configuration.
+- Production online-service mode remains available when selected by the developer.
