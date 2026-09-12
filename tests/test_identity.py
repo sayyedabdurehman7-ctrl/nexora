@@ -6,10 +6,9 @@ from fastapi.testclient import TestClient
 from nexora.api.app import create_app
 from nexora.conversations import ConversationService, Message
 from nexora.identity import (
+    NEXORA_CREATOR_DESCRIPTION,
     NEXORA_INTRODUCTION,
-    NEXORA_PROJECT_DESCRIPTION,
     SAFE_IDENTITY_FALLBACK,
-    nexora_about,
     violates_identity,
 )
 
@@ -27,11 +26,11 @@ async def ask(chat: ConversationService, question: str) -> str:
     ("question", "expected"),
     [
         ("Who are you?", NEXORA_INTRODUCTION),
-        ("What is NEXORA?", NEXORA_PROJECT_DESCRIPTION),
-        ("Tell me about this platform.", NEXORA_PROJECT_DESCRIPTION),
-        ("Who developed NEXORA?", NEXORA_PROJECT_DESCRIPTION),
-        ("Who created you?", NEXORA_PROJECT_DESCRIPTION),
-        ("Tell me about this project.", NEXORA_PROJECT_DESCRIPTION),
+        ("What is NEXORA?", NEXORA_INTRODUCTION),
+        ("Tell me about this platform.", NEXORA_INTRODUCTION),
+        ("Who developed NEXORA?", NEXORA_CREATOR_DESCRIPTION),
+        ("Who created you?", NEXORA_CREATOR_DESCRIPTION),
+        ("Tell me about this project.", NEXORA_INTRODUCTION),
         ("Are you Gemini?", "No. " + NEXORA_INTRODUCTION),
         ("Are you a chatbot?", "No. " + NEXORA_INTRODUCTION),
     ],
@@ -55,7 +54,7 @@ async def test_provider_question_is_honest_without_changing_nexora_identity(serv
 async def test_about_response_includes_only_valid_saved_website(service):
     service.settings.creator_website = "https://example.com/creator"
     answer = await ask(ConversationService(service), "Who created you?")
-    assert answer == nexora_about("https://example.com/creator")
+    assert answer == NEXORA_CREATOR_DESCRIPTION + "\n\nLearn more: https://example.com/creator"
     assert "Sayed Abdur Rehman" in answer
 
 
@@ -85,7 +84,7 @@ class ScriptedProvider:
 async def test_unsafe_identity_is_rewritten_once_before_save(service):
     provider = ScriptedProvider(["I am Gemini, built by Google.", NEXORA_INTRODUCTION])
     chat = ConversationService(service, provider)
-    answer = await ask(chat, "Who are you?")
+    answer = await ask(chat, "Please help me with a general question.")
     assert provider.calls == 2
     assert answer == NEXORA_INTRODUCTION
     assert "Gemini" not in answer and "Google" not in answer
@@ -95,7 +94,7 @@ async def test_unsafe_identity_is_rewritten_once_before_save(service):
 async def test_second_unsafe_identity_uses_exact_safe_fallback(service):
     provider = ScriptedProvider(["I am ChatGPT.", "As an AI model, I can help."])
     chat = ConversationService(service, provider)
-    answer = await ask(chat, "Please introduce yourself.")
+    answer = await ask(chat, "Please explain my project deadline.")
     assert provider.calls == 2
     assert answer == SAFE_IDENTITY_FALLBACK
 

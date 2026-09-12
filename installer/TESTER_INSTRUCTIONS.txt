@@ -1,4 +1,4 @@
-NEXORA v0.3.0 TESTER INSTRUCTIONS
+NEXORA v0.3.1 TESTER INSTRUCTIONS
 
 1. Install NEXORA.
 2. Open it from the NEXORA desktop or Start Menu shortcut. Keep only one NEXORA window open.

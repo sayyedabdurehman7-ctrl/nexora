@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from nexora.credentials import read_service_token
 from nexora.identity import normalize_creator_website
 
 
@@ -46,6 +47,8 @@ class Settings(BaseSettings):
     llm_provider: Literal["gemini", "mock"] = "mock"
     gemini_api_key: SecretStr = SecretStr("")
     gemini_model: str = ""
+    nexora_service_url: str = ""
+    nexora_service_token: SecretStr = SecretStr("")
     creator_website: str = ""
     voice_mode: Literal["off", "push_to_talk", "wake_word"] = "push_to_talk"
     assistant_voice_enabled: bool = False
@@ -73,6 +76,21 @@ class Settings(BaseSettings):
             value = value.get_secret_value()
         return str(value or "").strip().strip("\"'").strip()
 
+    @field_validator("nexora_service_token", mode="before")
+    @classmethod
+    def clean_service_token(cls, value):
+        if isinstance(value, SecretStr):
+            value = value.get_secret_value()
+        return str(value or "").strip().strip("\"'").strip()
+
+    @field_validator("nexora_service_url")
+    @classmethod
+    def validate_service_url(cls, value: str) -> str:
+        value = (value or "").strip().rstrip("/")
+        if value and not value.startswith("https://"):
+            raise ValueError("NEXORA_SERVICE_URL must use HTTPS")
+        return value
+
     @field_validator("creator_website")
     @classmethod
     def validate_creator_website(cls, value: str) -> str:
@@ -98,12 +116,19 @@ class Settings(BaseSettings):
             self.gemini_model = ""
         return self
 
+    @property
+    def nexora_service_configured(self) -> bool:
+        return bool(self.nexora_service_url and self.nexora_service_token.get_secret_value())
+
 
 def load_settings(app_dir: Path | None = None) -> Settings:
     """Load settings from an absolute writable data directory."""
     env_path = (app_dir or data_dir()).resolve() / ".env"
     load_dotenv(dotenv_path=env_path, override=False)
-    return Settings(_env_file=env_path)
+    settings = Settings(_env_file=env_path)
+    if settings.nexora_service_url and not settings.nexora_service_token.get_secret_value():
+        settings.nexora_service_token = SecretStr(read_service_token())
+    return settings
 
 
 def gemini_key_diagnostic(settings: Settings | None = None) -> str:

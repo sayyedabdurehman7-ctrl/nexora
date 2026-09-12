@@ -5,10 +5,13 @@ import re
 from collections.abc import AsyncIterator
 from typing import Literal, Protocol
 
+import httpx
+
 from nexora.identity import (
     NEXORA_IDENTITY_POLICY,
     NEXORA_INTRODUCTION,
     NEXORA_PROJECT_DESCRIPTION,
+    identity_response,
     is_identity_question,
 )
 from nexora.models import PlanStep, RequestType, Risk
@@ -26,6 +29,11 @@ MODE_INSTRUCTIONS: dict[AnswerMode, str] = {
 }
 
 NO_LIVE_SOURCES = "Detailed analysis completed. Live web sources are not available in this mode."
+ONLINE_UNAVAILABLE = "NEXORA's intelligent replies are temporarily unavailable. Please try again when NEXORA is ready."
+DEMO_UNSUPPORTED = (
+    "This feature needs NEXORA’s online service. You can still test planning, local files, PDFs, "
+    "calculations and the application interface in Demo mode."
+)
 
 
 class LLMProvider(Protocol):
@@ -44,6 +52,7 @@ class ProviderError(RuntimeError):
 class FallbackProvider:
     def __init__(self, primary: LLMProvider):
         self.primary = primary
+        self.mode = "online"
 
     def classify_goal(self, goal: str) -> RequestType:
         return MockLLMProvider().classify_goal(goal)
@@ -52,35 +61,33 @@ class FallbackProvider:
         return MockLLMProvider().create_plan(goal)
 
     async def health_check(self) -> dict:
-        return await self.primary.health_check()
+        result = await self.primary.health_check()
+        self.mode = "online" if result.get("status") == "Connected" else "offline"
+        return result
 
     async def stream_chat(self, messages: list[dict], answer_mode: AnswerMode = "medium") -> AsyncIterator[str]:
         try:
             async for delta in self.primary.stream_chat(messages, answer_mode):
+                self.mode = "online"
                 yield delta
-        except ProviderError as exc:
-            message = {
-                "API key missing": "NEXORA's online service is not configured. Using limited offline mode.",
-                "Quota limit reached": (
-                    "NEXORA's online service is temporarily at its limit. Using limited offline mode."
-                ),
-                "Offline": "NEXORA cannot connect to its online service. Using limited offline mode.",
-            }.get(exc.status, "NEXORA's online service is unavailable. Using limited offline mode.")
-            yield message + "\n\n"
-            async for delta in MockLLMProvider().stream_chat(messages, answer_mode):
-                yield delta
+        except ProviderError:
+            self.mode = "offline"
+            yield ONLINE_UNAVAILABLE
 
 
 class MockLLMProvider:
+    mode = "demo"
+
     async def health_check(self) -> dict:
         return {"status": "Connected", "mode": "demo"}
 
     async def stream_chat(self, messages: list[dict], answer_mode: AnswerMode = "medium") -> AsyncIterator[str]:
         goal = messages[-1]["content"]
         lowered = goal.lower()
-        normalized = re.sub(r"[^a-z0-9 ]+", "", lowered).strip()
-        if normalized in {"who are you", "what are you"}:
-            answer = NEXORA_INTRODUCTION
+        normalized = " ".join(re.sub(r"[^a-z0-9 ]+", " ", lowered).split())
+        local_identity = identity_response(goal)
+        if local_identity:
+            answer = local_identity
         elif normalized in {"what is nexora", "tell me about this platform", "tell me about nexora"}:
             answer = NEXORA_PROJECT_DESCRIPTION
         elif normalized in {"are you gemini", "are you chatgpt", "are you a chatbot"}:
@@ -110,13 +117,35 @@ class MockLLMProvider:
             answer = "Your previous message was: " + previous[-1] if previous else "This is our first message."
         elif lowered in ("hello", "hi", "hey"):
             answer = "Hello! We can talk about your project or work on a goal. What would you like to do?"
-        else:
+        elif normalized in {"help", "show me help", "how do i use nexora", "how to use nexora"}:
             answer = (
-                f"I received your message: {goal}\n\n"
-                "This limited offline response follows built-in examples. "
-                "You can already try 'calculate 2 + 3', 'list files', or 'summarize pdf paper.pdf'."
+                "You can chat, create a task plan, calculate, list approved local files, extract PDF text, "
+                "review saved conversations, and send tester feedback. Use the left sidebar to move between sections."
             )
-        if is_identity_question(goal):
+        elif any(word in normalized for word in ("privacy", "private", "data safety")):
+            answer = (
+                "Demo conversations and settings stay on this computer in NEXORA’s local data folder. "
+                "Audio is not saved by default, and sensitive actions require approval."
+            )
+        elif "feedback" in normalized:
+            answer = (
+                "Open Settings, find Tester Feedback, describe what worked or felt confusing, "
+                "then save the report."
+            )
+        elif any(word in normalized for word in ("navigate", "navigation", "sidebar", "settings", "history")):
+            answer = (
+                "Use the left sidebar for a new chat, recent conversations, projects, tasks, files, memory, "
+                "and Settings. "
+                "Use NEXORA Workspace at the top to view a task plan and activity."
+            )
+        elif normalized in {"features", "supported features", "what features are available"}:
+            answer = (
+                "In Demo mode you can test conversations, planning, calculations, approved local files, PDF text "
+                "extraction, voice controls, saved history, privacy controls, and tester feedback."
+            )
+        else:
+            answer = DEMO_UNSUPPORTED
+        if is_identity_question(goal) or answer == DEMO_UNSUPPORTED:
             pass
         elif answer_mode == "light":
             answer = answer.split("\n\n", 1)[0]
@@ -130,6 +159,75 @@ class MockLLMProvider:
         for offset in range(0, len(answer), 36):
             await asyncio.sleep(0.01)
             yield answer[offset : offset + 36]
+
+
+class NexoraServiceProvider(MockLLMProvider):
+    """Authenticated adapter for a developer-operated NEXORA service."""
+
+    def __init__(self, base_url: str, token: str, client=None):
+        self.base_url = base_url.rstrip("/")
+        self._token = token
+        self._client = client
+        self.mode = "online" if self.base_url and self._token else "demo"
+
+    def _headers(self) -> dict[str, str]:
+        return {"Authorization": f"Bearer {self._token}", "User-Agent": "NEXORA-Desktop"}
+
+    async def health_check(self) -> dict:
+        if not self.base_url or not self._token:
+            self.mode = "demo"
+            return {"status": "Not configured", "mode": "demo"}
+        owned = self._client is None
+        client = self._client or httpx.AsyncClient(timeout=httpx.Timeout(4.0))
+        try:
+            response = await client.get(f"{self.base_url}/health", headers=self._headers())
+            response.raise_for_status()
+            self.mode = "online"
+            return {"status": "Connected", "mode": "online"}
+        except Exception:
+            self.mode = "offline"
+            return {"status": "Offline", "mode": "offline"}
+        finally:
+            if owned:
+                await client.aclose()
+
+    async def stream_chat(self, messages: list[dict], answer_mode: AnswerMode = "medium") -> AsyncIterator[str]:
+        if not self.base_url or not self._token:
+            self.mode = "demo"
+            raise ProviderError("Not configured", "NEXORA online service is not configured.")
+        owned = self._client is None
+        client = self._client or httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=5.0))
+        try:
+            for attempt in range(2):
+                try:
+                    response = await client.post(
+                        f"{self.base_url}/v1/chat",
+                        headers=self._headers(),
+                        json={"messages": messages, "answer_mode": answer_mode},
+                    )
+                    response.raise_for_status()
+                    payload = response.json()
+                    reply = payload.get("reply") or payload.get("text")
+                    if not isinstance(reply, str) or not reply.strip():
+                        raise ProviderError("Provider error", "NEXORA service returned an invalid response.")
+                    self.mode = "online"
+                    yield reply.strip()
+                    return
+                except ProviderError:
+                    raise
+                except Exception as exc:
+                    retryable = isinstance(exc, (httpx.TimeoutException, httpx.NetworkError)) or getattr(
+                        getattr(exc, "response", None), "status_code", 0
+                    ) >= 500
+                    if retryable and attempt == 0:
+                        self.mode = "reconnecting"
+                        await asyncio.sleep(0.25)
+                        continue
+                    self.mode = "offline"
+                    raise ProviderError("Offline", "NEXORA service is temporarily unavailable.") from None
+        finally:
+            if owned:
+                await client.aclose()
 
     def classify_goal(self, goal: str) -> RequestType:
         lowered = goal.lower().strip()
@@ -202,6 +300,11 @@ class MockLLMProvider:
             )
             steps.append(step)
         return steps
+
+
+# The service adapter reuses the same safe local task grammar as Mock mode.
+MockLLMProvider.classify_goal = NexoraServiceProvider.classify_goal
+MockLLMProvider.create_plan = NexoraServiceProvider.create_plan
 
 
 class GeminiProvider(MockLLMProvider):

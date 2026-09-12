@@ -4,8 +4,14 @@ import re
 from urllib.parse import urlsplit, urlunsplit
 
 NEXORA_INTRODUCTION = (
-    "I am NEXORA, your personal AI workspace. I can help you discuss ideas, plan tasks, "
-    "organize work, answer questions, and complete approved actions."
+    "I am NEXORA, an autonomous multimodal personal AI workspace. I help users discuss problems, "
+    "understand goals, create plans, work with selected tools, and verify results through text and voice. "
+    "NEXORA is currently being developed as a final-year Computer Science project."
+)
+NEXORA_CREATOR_DESCRIPTION = (
+    "NEXORA was developed by Sayed Abdur Rehman as his final-year Computer Science project. "
+    "It was created to help users turn goals into clear plans, use selected tools safely, verify results, "
+    "and work through text or voice."
 )
 NEXORA_PROJECT_DESCRIPTION = (
     "NEXORA is an autonomous multimodal personal AI agent developed by Sayed Abdur Rehman as a final-year "
@@ -73,18 +79,55 @@ def allows_service_discussion(user_text: str) -> bool:
 
 
 def is_identity_question(user_text: str) -> bool:
-    """Return whether the prompt asks directly for NEXORA's identity or product description."""
-    normalized = re.sub(r"[^a-z0-9 ]+", "", user_text.lower()).strip()
-    return normalized in {
+    """Recognize common identity and introduction wording without one exact sentence."""
+    normalized = normalize_intent(user_text)
+    exact = {
         "who are you",
         "what are you",
         "what is nexora",
         "tell me about nexora",
         "tell me about this platform",
+        "tell me about yourself",
+        "introduce yourself",
+        "please introduce yourself",
+        "give me your introduction",
+        "give me self introduction",
+        "give me an introduction",
         "who developed nexora",
         "who created you",
         "who created nexora",
         "tell me about this project",
+        "what can you do",
+        "how can you help me",
+    }
+    return normalized in exact or bool(
+        re.fullmatch(r"(?:please )?(?:give|tell) me (?:a |your |self )?introduction", normalized)
+    )
+
+
+def normalize_intent(user_text: str) -> str:
+    """Normalize short local intents while keeping matching deterministic."""
+    return " ".join(re.sub(r"[^a-z0-9 ]+", " ", user_text.lower()).split())
+
+
+def is_creator_question(user_text: str) -> bool:
+    normalized = normalize_intent(user_text)
+    return normalized in {
+        "who developed you",
+        "who developed nexora",
+        "who created you",
+        "who created nexora",
+        "who is the creator of nexora",
+    }
+
+
+def is_capability_question(user_text: str) -> bool:
+    return normalize_intent(user_text) in {
+        "what can you do",
+        "what features do you support",
+        "what are your features",
+        "how can you help",
+        "how can you help me",
     }
 
 
@@ -100,6 +143,16 @@ def is_about_question(user_text: str) -> bool:
         "who created nexora",
         "who created you",
     }
+
+
+def identity_response(user_text: str, creator_website: str = "") -> str | None:
+    """Return the approved local identity answer in every provider mode."""
+    if not is_identity_question(user_text):
+        return None
+    if is_creator_question(user_text):
+        website = normalize_creator_website(creator_website)
+        return NEXORA_CREATOR_DESCRIPTION + (f"\n\nLearn more: {website}" if website else "")
+    return NEXORA_INTRODUCTION
 
 
 def normalize_creator_website(value: str) -> str:

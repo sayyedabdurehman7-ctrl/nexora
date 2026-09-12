@@ -20,14 +20,14 @@ if (Test-Path $out) { Remove-Item -LiteralPath $out -Recurse -Force }
 New-Item -ItemType Directory -Path $dist -Force | Out-Null
 
 Write-Host 'Packaging the NEXORA desktop interface...'
-& $flet pack src\nexora\ui\app.py --name NEXORA --product-name NEXORA --product-version 0.3.0 `
+& $flet pack src\nexora\ui\app.py --name NEXORA --product-name NEXORA --product-version 0.3.1 `
     --onedir --distpath (Join-Path $out 'ui') --yes
 if ($LASTEXITCODE -ne 0) { throw 'Flet packaging failed.' }
 
 Write-Host 'Packaging the local NEXORA backend...'
 & $python -m PyInstaller --clean --noconfirm --onedir --name NexoraBackend `
     --distpath (Join-Path $out 'backend') --paths src `
-    --hidden-import nexora.api.conversation_routes --hidden-import nexora.speech_worker `
+    --hidden-import nexora.api.conversation_routes --hidden-import nexora.speech_worker --hidden-import win32cred `
     --hidden-import google.genai --collect-submodules faster_whisper --collect-submodules pyttsx3 `
     --collect-data certifi --exclude-module nexora.ui --exclude-module flet `
     --exclude-module flet_desktop src\nexora\api\app.py
@@ -42,7 +42,7 @@ Copy-Item -LiteralPath 'README.md' -Destination (Join-Path $dist 'README.md') -F
 Copy-Item -LiteralPath 'assets' -Destination (Join-Path $dist 'assets') -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'launch-installed.ps1') -Destination (Join-Path $dist 'launch-installed.ps1') -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'TESTER_INSTRUCTIONS.txt') -Destination $dist -Force
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'CHANGELOG-v0.3.0.txt') -Destination $dist -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'CHANGELOG-v0.3.1.txt') -Destination $dist -Force
 Set-Content -LiteralPath (Join-Path $dist 'build-profile.txt') -Value $Profile -Encoding ASCII
 
 if (!$PortableOnly) {

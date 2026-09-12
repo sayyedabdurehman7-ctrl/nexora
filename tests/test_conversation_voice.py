@@ -93,8 +93,8 @@ async def test_answer_modes_are_persisted_and_strong_is_honest(service):
     await chat.running[item.id]
     saved = chat.store.get(item.id)
     assert [message.answer_mode for message in saved.messages] == ["strong", "strong"]
-    assert saved.messages[-1].content.count(NO_LIVE_SOURCES) == 1
-    assert saved.messages[-1].content.startswith("## Answer")
+    assert saved.messages[-1].content.count(NO_LIVE_SOURCES) == 0
+    assert "This feature needs NEXORA" in saved.messages[-1].content
 
     light = chat.create()
     chat.send(light.id, "hello", "light")

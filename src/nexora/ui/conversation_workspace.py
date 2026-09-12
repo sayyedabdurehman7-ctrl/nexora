@@ -131,6 +131,7 @@ class ConversationWorkspace(Workspace):
         if not self.conversation:
             return
         self.conversation = await self.client.request("GET", f"/api/v1/conversations/{self.conversation['id']}")
+        self.state.settings.update(await self.client.request("GET", "/api/v1/settings"))
         linked = [m for m in self.conversation["messages"] if m.get("task_id")]
         if linked:
             await self.load_task(linked[-1]["task_id"])

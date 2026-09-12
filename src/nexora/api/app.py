@@ -43,6 +43,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         service.recover_interrupted()
         app.state.service = service
         app.state.chat = ConversationService(service)
+        await app.state.chat.initialize()
         app.state.voice = VoiceService(config)
         diagnostic_log.info("profile=%s stage=ready database=ready", config.nexora_build_profile)
         yield
@@ -118,7 +119,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "status": "ok",
             "version": APP_VERSION,
             "build_profile": config.nexora_build_profile,
-            "mode": "demo" if config.llm_provider == "mock" else "online",
+            "mode": request.app.state.chat.mode,
             "safe_mode": config.nexora_safe_mode,
         }
         if config.nexora_build_profile == "developer":
@@ -131,8 +132,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # Explicit allowlist: never serialize the settings object or secret fields.
         result = {
             "build_profile": config.nexora_build_profile,
-            "connection_status": "NEXORA is ready",
-            "demo_mode": config.llm_provider == "mock",
+            "mode": request.app.state.chat.mode,
+            "connection_status": request.app.state.chat.connection_status,
+            "demo_mode": request.app.state.chat.mode == "demo",
             "creator_website": config.creator_website,
             "voice_mode": config.voice_mode,
             "assistant_voice_enabled": config.assistant_voice_enabled,

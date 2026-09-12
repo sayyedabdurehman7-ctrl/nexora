@@ -1,7 +1,7 @@
 param([switch]$RecoveryTest)
 
 $ErrorActionPreference = 'Stop'
-$appVersion = '0.3.0'
+$appVersion = '0.3.1'
 $appDir = $PSScriptRoot
 $profileFile = Join-Path $appDir 'build-profile.txt'
 $buildProfile = if (Test-Path -LiteralPath $profileFile) {
@@ -243,7 +243,7 @@ function Start-NexoraSession {
 }
 
 try {
-    $script:instanceMutex = New-Object Threading.Mutex($false, "Local\NEXORA-Desktop-v030-$buildProfile")
+    $script:instanceMutex = New-Object Threading.Mutex($false, "Local\NEXORA-Desktop-v031-$buildProfile")
     if (!$script:instanceMutex.WaitOne(0)) {
         Add-Type -AssemblyName PresentationFramework
         [Windows.MessageBox]::Show('NEXORA is already open.', 'NEXORA', 'OK', 'Information') | Out-Null

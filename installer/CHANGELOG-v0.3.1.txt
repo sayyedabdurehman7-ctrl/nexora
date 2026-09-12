@@ -1,0 +1,8 @@
+NEXORA v0.3.1 Tester
+
+Self-introduction and Demo mode improvements:
+- “give me self introduction” now receives the approved NEXORA introduction.
+- Creator, feature, help, privacy, feedback, navigation, and greeting prompts have useful local replies.
+- Unsupported questions explain that the online NEXORA service is required; no generic echo is shown.
+- Tester builds can use a developer-operated HTTPS NEXORA service through deployment configuration while keeping provider controls hidden.
+- Service tokens can be read from Windows Credential Manager and are never logged or bundled.

@@ -137,7 +137,8 @@ async def test_public_settings_never_exposes_keys(workspace):
     ui, _ = workspace
     assert set(ui.state.settings) == {
         "build_profile",
-        "connection_status",
+            "connection_status",
+            "mode",
         "demo_mode",
         "provider",
         "gemini_key_status",

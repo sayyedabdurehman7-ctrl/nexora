@@ -181,3 +181,12 @@ exora.web_app:app to serve FastAPI and Flet together for a hosted service.
 - Fixed the backend package layout and removed a duplicate Flet runtime that exceeded normal Windows installer path limits. The packaged backend includes `python312.dll` and starts without a system Python command.
 - Final verification: Ruff passed; **124 tests passed, 1 skipped**; packaged `/health` passed; clean-folder install, backend crash recovery, reopen/history persistence, uninstall, reinstall, secret scan, and removed-provider search passed.
 - Built `installer/output/NEXORA-Setup-v0.3.0-Tester.exe` (142.42 MiB), SHA-256 `FAF27B6252916498867B80EE162AC5F680FE06467AC0111A59441B1BC65A261D`.
+
+## Demo self-introduction and secure online-service boundary v0.3.1 — 2026-09-12
+
+- Diagnosed the tester screenshot: Demo mode was intentional because the build profile forces keyless offline operation, while the generic Demo echo branch ran before identity matching. The old generic echo is removed.
+- Added semantic local intent handling for self-introduction, creator, capabilities, help, greetings, privacy, feedback, navigation, and feature questions. Unsupported general questions now explain the online-service limitation honestly.
+- Added an authenticated HTTPS `NexoraServiceProvider` boundary for a future developer-operated service. Tester and production builds use it only when both a service URL and credential are provisioned; otherwise they remain Demo mode. Tokens can be read from Windows Credential Manager and are never logged or bundled.
+- Added mode-aware health/settings status (`online`, `demo`, `reconnecting`, `offline`) while keeping provider details out of normal tester UI.
+- Verification: Ruff passed; **126 passed, 1 skipped**; the v0.3.1 packaged backend returned the exact NEXORA introduction; secret and removed-provider scans passed.
+- Built `installer/output/NEXORA-Setup-v0.3.1-Tester.exe` (142.46 MiB), SHA-256 `5C8D514A679CDD6F4F52E7EF5F68BD2C6ECD49A1D9C8A87C5D7591BD7444930C`. See `docs/TESTER_RELEASE_v0.3.1.md`.

@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from nexora.api.app import create_app
 from nexora.config import gemini_key_diagnostic, load_settings
 from nexora.identity import NEXORA_IDENTITY_POLICY
-from nexora.providers import FallbackProvider, GeminiProvider, ProviderError
+from nexora.providers import ONLINE_UNAVAILABLE, FallbackProvider, GeminiProvider, ProviderError
 
 
 class FakeModels:
@@ -57,7 +57,7 @@ async def test_gemini_missing_key_and_mock_fallback():
 
     fallback = FallbackProvider(provider)
     result = "".join([part async for part in fallback.stream_chat([{"role": "user", "content": "hi"}])])
-    assert result.startswith("NEXORA's online service is not configured")
+    assert result == ONLINE_UNAVAILABLE
 
 
 @pytest.mark.asyncio
@@ -83,11 +83,8 @@ async def test_gemini_quota_and_invalid_model_errors():
 @pytest.mark.parametrize(
     ("status", "expected"),
     [
-        ("Quota limit reached", "NEXORA's online service is temporarily at its limit"),
-        (
-            "Offline",
-            "NEXORA cannot connect to its online service",
-        ),
+            ("Quota limit reached", ONLINE_UNAVAILABLE),
+            ("Offline", ONLINE_UNAVAILABLE),
     ],
 )
 async def test_gemini_fallback_messages(status, expected):
@@ -104,7 +101,7 @@ async def test_gemini_fallback_messages(status, expected):
 
     provider = FallbackProvider(FailedProvider())
     result = "".join([part async for part in provider.stream_chat([{"role": "user", "content": "hi"}])])
-    assert result.startswith(expected)
+    assert result == expected
 
 
 def test_gemini_selection_and_missing_key_status(settings):

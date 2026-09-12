@@ -154,6 +154,13 @@ class Workspace:
                         tooltip="Open plans and activity",
                         on_click=self.toggle_panel,
                     ) if screen == "Chat" else ft.Container(),
+                    ft.Text(
+                        self.state.settings.get("connection_status", ""),
+                        size=12,
+                        color=colors["muted"],
+                        max_lines=1,
+                        overflow=ft.TextOverflow.ELLIPSIS,
+                    ),
                     ft.PopupMenuButton(icon=ft.Icons.MORE_HORIZ, tooltip="More", items=more_items),
                 ],
                 spacing=8,
@@ -169,9 +176,10 @@ class Workspace:
                         overflow=ft.TextOverflow.ELLIPSIS,
                         expand=True,
                     ),
-                    badge("Demo mode", "#268365")
-                    if self.state.settings.get("demo_mode", True)
-                    else ft.Container(),
+                    badge(
+                        self.state.settings.get("connection_status", "NEXORA is ready"),
+                        "#268365" if self.state.settings.get("demo_mode", True) else PRIMARY,
+                    ),
                     ft.IconButton(ft.Icons.DARK_MODE_OUTLINED, tooltip="Toggle theme", on_click=self.toggle_theme),
                     ft.IconButton(ft.Icons.VIEW_SIDEBAR_OUTLINED, tooltip="Show plan", on_click=self.toggle_panel),
                 ]
