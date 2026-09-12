@@ -1,7 +1,7 @@
 param([switch]$RecoveryTest)
 
 $ErrorActionPreference = 'Stop'
-$appVersion = '0.3.1'
+$appVersion = '0.3.2'
 $appDir = $PSScriptRoot
 $profileFile = Join-Path $appDir 'build-profile.txt'
 $buildProfile = if (Test-Path -LiteralPath $profileFile) {
@@ -120,8 +120,9 @@ function Get-BackendError {
 function Test-NexoraHealth([int]$Port) {
     try {
         $health = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 2
+        $expectedMode = if ($health.online_service_configured) { 'online' } else { 'demo' }
         return $health.status -eq 'ok' -and $health.version -eq $appVersion -and `
-            $health.build_profile -eq $buildProfile -and $health.safe_mode
+            $health.build_profile -eq $buildProfile -and $health.safe_mode -and $health.mode -eq $expectedMode
     } catch { return $false }
 }
 
@@ -243,7 +244,7 @@ function Start-NexoraSession {
 }
 
 try {
-    $script:instanceMutex = New-Object Threading.Mutex($false, "Local\NEXORA-Desktop-v031-$buildProfile")
+    $script:instanceMutex = New-Object Threading.Mutex($false, "Local\NEXORA-Desktop-v032-$buildProfile")
     if (!$script:instanceMutex.WaitOne(0)) {
         Add-Type -AssemblyName PresentationFramework
         [Windows.MessageBox]::Show('NEXORA is already open.', 'NEXORA', 'OK', 'Information') | Out-Null

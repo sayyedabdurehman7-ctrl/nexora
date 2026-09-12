@@ -190,3 +190,9 @@ exora.web_app:app to serve FastAPI and Flet together for a hosted service.
 - Added mode-aware health/settings status (`online`, `demo`, `reconnecting`, `offline`) while keeping provider details out of normal tester UI.
 - Verification: Ruff passed; **126 passed, 1 skipped**; the v0.3.1 packaged backend returned the exact NEXORA introduction; secret and removed-provider scans passed.
 - Built `installer/output/NEXORA-Setup-v0.3.1-Tester.exe` (142.46 MiB), SHA-256 `5C8D514A679CDD6F4F52E7EF5F68BD2C6ECD49A1D9C8A87C5D7591BD7444930C`. See `docs/TESTER_RELEASE_v0.3.1.md`.
+## Truthful online-service readiness v0.3.2 — 2026-09-12
+
+- Diagnosed the tester screenshot: the package was intentionally built as keyless Tester mode; the launcher forces `LLM_PROVIDER=mock`, the tester settings validator strips Gemini credentials, and no `NEXORA_SERVICE_URL`/service token is configured. Demo mode was therefore expected, not a failed Gemini health check.
+- Kept the secure service boundary intact: Tester/Production use the authenticated HTTPS NEXORA service when both URL and credential are provisioned; otherwise they remain deterministic Demo mode.
+- The launcher now waits for an online service to report healthy before treating a configured deployment as ready. Health responses include only safe mode/status fields, and developer diagnostics report redacted configuration and fallback state.
+- Unsupported Demo questions now use the honest wording requested by the tester brief. No secret is bundled.

@@ -29,13 +29,13 @@ def test_tester_profile_forces_demo_and_removes_developer_routes(tmp_path):
     assert not settings.gemini_api_key.get_secret_value()
     with TestClient(create_app(settings)) as client:
         health = client.get("/health").json()
-        assert health == {
-            "status": "ok",
-            "version": "0.3.1",
-            "build_profile": "tester",
-            "mode": "demo",
-            "safe_mode": True,
-        }
+        assert health["status"] == "ok"
+        assert health["version"] == "0.3.2"
+        assert health["build_profile"] == "tester"
+        assert health["mode"] == "demo"
+        assert health["connection_status"] == "Demo mode"
+        assert health["online_service_configured"] is False
+        assert health["safe_mode"] is True
         public = client.get("/api/v1/settings").json()
         assert public["connection_status"] == "Demo mode"
         assert public["demo_mode"] is True

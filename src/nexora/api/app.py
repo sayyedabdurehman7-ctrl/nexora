@@ -115,16 +115,39 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/health")
     async def health(request: Request):
         config = request.app.state.service.settings
+        chat = request.app.state.chat
         status = {
             "status": "ok",
             "version": APP_VERSION,
             "build_profile": config.nexora_build_profile,
-            "mode": request.app.state.chat.mode,
+            "mode": chat.mode,
+            "connection_status": chat.connection_status,
+            "online_service_configured": config.nexora_service_configured,
             "safe_mode": config.nexora_safe_mode,
         }
         if config.nexora_build_profile == "developer":
             status["provider"] = config.llm_provider
         return status
+
+    @app.get("/api/v1/diagnostics")
+    async def diagnostics(request: Request):
+        """Developer-only, redacted startup/provider report."""
+        config = request.app.state.service.settings
+        if config.nexora_build_profile != "developer":
+            return error(request, 404, "NOT_FOUND", "Diagnostic report is unavailable.")
+        chat = request.app.state.chat
+        provider = getattr(chat, "provider", None)
+        health_result = getattr(provider, "last_health", {})
+        return {
+            "build_profile": config.nexora_build_profile,
+            "selected_provider": config.llm_provider,
+            "online_service_url_configured": config.nexora_service_configured,
+            "health_check": health_result.get("status", "Not checked"),
+            "backend_process": "running",
+            "configuration_source": "application .env or process environment",
+            "fallback_reason": getattr(provider, "fallback_reason", ""),
+            "exception_category": "",
+        }
 
     @app.get("/api/v1/settings")
     async def public_settings(request: Request):

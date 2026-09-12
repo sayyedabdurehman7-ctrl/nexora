@@ -1,0 +1,5 @@
+NEXORA v0.3.2
+
+- Online-service health is now checked before the desktop session is marked ready.
+- Tester mode remains honest Demo mode when no secure NEXORA service is configured.
+- Developer diagnostics expose only redacted provider and recovery state.

@@ -31,8 +31,8 @@ MODE_INSTRUCTIONS: dict[AnswerMode, str] = {
 NO_LIVE_SOURCES = "Detailed analysis completed. Live web sources are not available in this mode."
 ONLINE_UNAVAILABLE = "NEXORA's intelligent replies are temporarily unavailable. Please try again when NEXORA is ready."
 DEMO_UNSUPPORTED = (
-    "This feature needs NEXORA’s online service. You can still test planning, local files, PDFs, "
-    "calculations and the application interface in Demo mode."
+    "This question needs NEXORA’s online service. Demo mode can still demonstrate planning, calculations, "
+    "local files, PDFs and the main interface."
 )
 
 
@@ -53,6 +53,8 @@ class FallbackProvider:
     def __init__(self, primary: LLMProvider):
         self.primary = primary
         self.mode = "online"
+        self.last_health: dict = {"status": "Not checked", "mode": "online"}
+        self.fallback_reason = ""
 
     def classify_goal(self, goal: str) -> RequestType:
         return MockLLMProvider().classify_goal(goal)
@@ -62,7 +64,9 @@ class FallbackProvider:
 
     async def health_check(self) -> dict:
         result = await self.primary.health_check()
+        self.last_health = result
         self.mode = "online" if result.get("status") == "Connected" else "offline"
+        self.fallback_reason = "" if self.mode == "online" else result.get("status", "health check failed")
         return result
 
     async def stream_chat(self, messages: list[dict], answer_mode: AnswerMode = "medium") -> AsyncIterator[str]:
@@ -72,6 +76,7 @@ class FallbackProvider:
                 yield delta
         except ProviderError:
             self.mode = "offline"
+            self.fallback_reason = "online service request failed"
             yield ONLINE_UNAVAILABLE
 
 
