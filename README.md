@@ -1,3 +1,12 @@
+---
+title: NEXORA
+emoji: 🚀
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+---
+
 # NEXORA
 
 An Autonomous Multimodal Personal AI Agent for Goal-Based Task Planning, Tool Selection,

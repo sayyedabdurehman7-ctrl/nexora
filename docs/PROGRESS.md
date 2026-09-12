@@ -129,3 +129,4 @@ exora.web_app:app to serve FastAPI and Flet together for a hosted service.
 - Added Dockerfile, ender.yaml, and docs/DEPLOY_RENDER.md for GitHub-connected Render deployment.
 - API host/port and UI client now honor HOST, PORT, and NEXORA_ALLOWED_HOSTS.
 - Verified hosted entrypoint imports successfully. Full pytest run is blocked by Windows temp-folder permissions in this workspace (38 passed, 67 setup errors).
+- Added Hugging Face Docker Space metadata and deployment instructions as a no-card alternative.
