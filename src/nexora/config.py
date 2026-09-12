@@ -23,8 +23,15 @@ def application_dir() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def data_dir() -> Path:
+    """Return the writable per-user data folder selected by the launcher."""
+    configured = os.getenv("NEXORA_DATA_DIR", "").strip().strip("\"'")
+    return Path(configured).expanduser().resolve() if configured else application_dir()
+
+
 APP_DIR = application_dir()
-ENV_FILE = APP_DIR / ".env"
+DATA_DIR = data_dir()
+ENV_FILE = DATA_DIR / ".env"
 
 # Load the deterministic application-local file before Pydantic reads any settings.
 load_dotenv(dotenv_path=ENV_FILE, override=False)
@@ -49,8 +56,9 @@ class Settings(BaseSettings):
     max_recording_seconds: int = Field(default=60, ge=1, le=120)
     max_response_tokens: int = Field(default=1200, ge=64, le=4096)
     search_provider: Literal["mock"] = "mock"
-    database_url: str = "sqlite:///data/nexora.db"
-    nexora_workspace_dir: Path = Path("data/user_files")
+    database_url: str = f"sqlite:///{(DATA_DIR / 'data' / 'nexora.db').as_posix()}"
+    nexora_workspace_dir: Path = DATA_DIR / "data" / "user_files"
+    nexora_data_dir: Path = DATA_DIR
     max_plan_steps: int = Field(default=10, ge=1, le=30)
     max_tool_retries: int = Field(default=2, ge=0, le=5)
     max_task_seconds: float = Field(default=180, gt=0, le=600)
@@ -84,8 +92,8 @@ class Settings(BaseSettings):
 
 
 def load_settings(app_dir: Path | None = None) -> Settings:
-    """Load settings from an absolute application-local .env path."""
-    env_path = (app_dir or application_dir()).resolve() / ".env"
+    """Load settings from an absolute writable data directory."""
+    env_path = (app_dir or data_dir()).resolve() / ".env"
     load_dotenv(dotenv_path=env_path, override=False)
     return Settings(_env_file=env_path)
 

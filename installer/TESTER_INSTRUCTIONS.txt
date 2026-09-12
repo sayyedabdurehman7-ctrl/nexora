@@ -1,0 +1,8 @@
+NEXORA TESTER INSTRUCTIONS
+
+1. Install NEXORA.
+2. Open it from the desktop shortcut.
+3. Try chat, voice, modes, and settings.
+4. Use Feedback if something is confusing or broken.
+
+NEXORA starts in Demo mode. No API key, Python, Git, or development software is required.

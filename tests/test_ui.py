@@ -130,7 +130,7 @@ async def test_offline_state():
 
     ui = Workspace(PageStub(), client=Offline(), state=UIState(preference_path=None))
     await ui.start()
-    assert not ui.state.connected and "offline" in ui.error
+    assert not ui.state.connected and "local service" in ui.error
 
 
 async def test_public_settings_never_exposes_keys(workspace):

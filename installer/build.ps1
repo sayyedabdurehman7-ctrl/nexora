@@ -18,7 +18,8 @@ if (Test-Path $out) { Remove-Item -LiteralPath $out -Recurse -Force }
 New-Item -ItemType Directory -Path $dist -Force | Out-Null
 
 Write-Host 'Packaging the NEXORA desktop interface...'
-& $flet pack src\nexora\ui\app.py --name NEXORA --product-name NEXORA --product-version 0.1.0 --onedir --distpath (Join-Path $out 'ui') --yes
+& $flet pack src\nexora\ui\app.py --name NEXORA --product-name NEXORA --product-version 0.2.0 `
+    --onedir --distpath (Join-Path $out 'ui') --yes
 if ($LASTEXITCODE -ne 0) { throw 'Flet packaging failed.' }
 
 Write-Host 'Packaging the local NEXORA backend...'
@@ -26,12 +27,15 @@ Write-Host 'Packaging the local NEXORA backend...'
 if ($LASTEXITCODE -ne 0) { throw 'Backend packaging failed.' }
 
 Copy-Item -Path (Join-Path $out 'ui\NEXORA\*') -Destination $dist -Recurse -Force
-Copy-Item -Path (Join-Path $out 'backend\NexoraBackend\*') -Destination (Join-Path $dist 'backend') -Recurse -Force
+$backendDist = Join-Path $dist 'backend'
+New-Item -ItemType Directory -Path $backendDist -Force | Out-Null
+Copy-Item -Path (Join-Path $out 'backend\NexoraBackend\*') -Destination $backendDist -Recurse -Force
 Copy-Item -LiteralPath '.env.example' -Destination (Join-Path $dist '.env.example') -Force
 Copy-Item -LiteralPath 'README.md' -Destination (Join-Path $dist 'README.md') -Force
 Copy-Item -LiteralPath 'assets' -Destination (Join-Path $dist 'assets') -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'launch-installed.ps1') -Destination (Join-Path $dist 'launch-installed.ps1') -Force
-New-Item -ItemType Directory -Path (Join-Path $dist 'data') -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'TESTER_INSTRUCTIONS.txt') -Destination $dist -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'CHANGELOG-v0.2.0.txt') -Destination $dist -Force
 
 if (!$PortableOnly) {
     $iscc = Get-Command iscc -ErrorAction SilentlyContinue

@@ -10,6 +10,11 @@ use the terminal's current folder to find the key.
 
 ## First setup
 
+For a friend or tester, use `installer\output\NEXORA-Setup-v0.2.0.exe`. They do not need
+Python, Git, a terminal, or an API key. The installer creates the desktop shortcut and
+starts Demo mode automatically. `Open NEXORA.bat` is retained only as an optional
+developer diagnostic launcher.
+
 Open PowerShell in the NEXORA project folder and run:
 
 ```powershell

@@ -5,6 +5,19 @@ from nexora.ui.theme import PRIMARY, card
 
 def settings(app) -> ft.Control:
     values, colors = app.state.settings, app.colors
+    feedback_values = getattr(
+        app,
+        "feedback_values",
+        {
+            "overall_experience": 5,
+            "confusing": "",
+            "error_seen": "",
+            "liked_feature": "",
+            "add_next": "",
+            "attach_diagnostic": False,
+        },
+    )
+    feedback_changed = getattr(app, "feedback_changed", lambda name: None)
     provider_controls = hasattr(app, "provider_changed")
     selected = getattr(app, "pending_provider", None) or values.get("provider", "gemini")
     model = (
@@ -42,6 +55,12 @@ def settings(app) -> ft.Control:
                             on_select=getattr(app, "provider_changed", None),
                             disabled=not provider_controls,
                             width=300,
+                        ),
+                        ft.Text(
+                            "Demo mode — no API key required" if selected == "mock" else "Online AI mode",
+                            size=13,
+                            color=colors["muted"],
+                            weight=ft.FontWeight.W_600,
                         ),
                         ft.Text(
                             "Gemini API: Connected"
@@ -83,6 +102,68 @@ def settings(app) -> ft.Control:
                         ),
                     ],
                     spacing=18,
+                ),
+                colors,
+            ),
+            ft.Text("Tester Feedback", size=24, weight=ft.FontWeight.W_600),
+            ft.Text(
+                "No login or internet is required. Save it locally or copy it into a message.",
+                color=colors["muted"],
+            ),
+            card(
+                ft.Column(
+                    [
+                        ft.Dropdown(
+                            label="Overall experience",
+                            value=str(feedback_values.get("overall_experience", 5)),
+                            options=[ft.DropdownOption(str(number), "★" * number) for number in range(1, 6)],
+                            on_select=feedback_changed("overall_experience"),
+                            width=240,
+                        ),
+                        ft.TextField(
+                            label="Was anything confusing?",
+                            max_length=1000,
+                            on_change=feedback_changed("confusing"),
+                        ),
+                        ft.TextField(
+                            label="Did you see an error?",
+                            max_length=1000,
+                            on_change=feedback_changed("error_seen"),
+                        ),
+                        ft.TextField(
+                            label="Which feature did you like?",
+                            max_length=1000,
+                            on_change=feedback_changed("liked_feature"),
+                        ),
+                        ft.TextField(
+                            label="What should NEXORA add next?",
+                            max_length=1000,
+                            on_change=feedback_changed("add_next"),
+                        ),
+                        ft.Checkbox(
+                            label="Attach diagnostic report",
+                            value=bool(feedback_values.get("attach_diagnostic")),
+                            on_change=feedback_changed("attach_diagnostic"),
+                        ),
+                        ft.Row(
+                            [
+                                ft.Button(
+                                    "Copy Feedback",
+                                    icon=ft.Icons.COPY_OUTLINED,
+                                    on_click=getattr(app, "copy_feedback", None),
+                                ),
+                                ft.Button(
+                                    "Save Feedback File",
+                                    icon=ft.Icons.SAVE_OUTLINED,
+                                    on_click=getattr(app, "save_feedback", None),
+                                    color="white",
+                                    bgcolor=PRIMARY,
+                                ),
+                            ],
+                            wrap=True,
+                        ),
+                    ],
+                    spacing=12,
                 ),
                 colors,
             ),

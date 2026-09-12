@@ -257,7 +257,7 @@ class Workspace:
             self.state.connected, self.error = True, ""
         except (httpx.HTTPError, ValueError):
             self.state.connected = False
-            self.error = "Backend offline or incompatible. Restart NEXORA with Open NEXORA.bat."
+            self.error = "NEXORA cannot connect to its local service. Try again or restart NEXORA."
 
     async def reconnect(self, e=None) -> None:
         self.state.busy = True

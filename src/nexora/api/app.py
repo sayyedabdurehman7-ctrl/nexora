@@ -16,9 +16,11 @@ from nexora.config import Settings, gemini_key_diagnostic, load_settings
 from nexora.conversations import ConversationService
 from nexora.core import Conflict, Service
 from nexora.db import Store
+from nexora.feedback import FeedbackInput, save_feedback
 from nexora.identity import normalize_creator_website
 from nexora.models import GoalInput
 from nexora.providers import GeminiProvider
+from nexora.version import APP_VERSION
 from nexora.voice import VoiceService
 
 
@@ -41,7 +43,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         await service.close()
         service.store.engine.dispose()
 
-    app = FastAPI(title="NEXORA", lifespan=lifespan)
+    app = FastAPI(title="NEXORA", version=APP_VERSION, lifespan=lifespan)
     host_setting = os.getenv("NEXORA_ALLOWED_HOSTS", "127.0.0.1,localhost,testserver")
     hosts = [host.strip() for host in host_setting.split(",") if host.strip()]
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts)
@@ -96,7 +98,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/health")
     async def health(request: Request):
-        return {"status": "ok", "provider": request.app.state.service.settings.llm_provider, "safe_mode": True}
+        config = request.app.state.service.settings
+        return {
+            "status": "ok",
+            "version": APP_VERSION,
+            "provider": config.llm_provider,
+            "provider_status": "demo" if config.llm_provider == "mock" else "configured",
+            "safe_mode": config.nexora_safe_mode,
+        }
 
     @app.get("/api/v1/settings")
     async def public_settings(request: Request):
@@ -159,6 +168,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         config.creator_website = body.creator_website
         request.app.state.service.store.set_setting("creator_website", body.creator_website)
         return {"creator_website": body.creator_website}
+
+    @app.post("/api/v1/feedback")
+    async def tester_feedback(body: FeedbackInput, request: Request):
+        config = request.app.state.service.settings
+        return {"saved": True, "filename": save_feedback(config.nexora_data_dir, body)}
 
     @app.post("/api/v1/tasks", status_code=201)
     async def create_goal(body: GoalInput, request: Request):
@@ -231,8 +245,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
 def main() -> None:
     uvicorn.run(
-        "nexora.api.app:create_app",
-        factory=True,
+        create_app(),
         host=os.getenv("HOST", "127.0.0.1"),
         port=int(os.getenv("PORT", "8000")),
         access_log=False,

@@ -1,0 +1,8 @@
+NEXORA 0.2.0
+
+- Fixed the packaged backend runtime layout that caused startup to fail on another computer.
+- Added automatic local port selection, health verification, and duplicate-launch protection.
+- Moved chats, settings, logs, feedback, and workspace files to the current user's Local AppData folder.
+- Added a recovery window with retry, diagnostics, error-report copy, and close actions.
+- Added local tester feedback that works without login or internet.
+- Fresh installations now start in Demo mode without an API key.

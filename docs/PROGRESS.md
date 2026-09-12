@@ -151,3 +151,13 @@ exora.web_app:app to serve FastAPI and Flet together for a hosted service.
 - Added About NEXORA navigation, the approved project and creator introduction, and a validated optional Creator website setting stored in SQLite. Invalid or invented links are never shown.
 - Added regression coverage for 60-message conversations, long answer text, unique stable keys, scroll policy, stable sidebar reuse, About prompts, creator-link validation, and saved About settings.
 - Verification: Ruff passed and the offline suite completed with **115 passed, 1 skipped**. The skipped check requires Windows symlink privileges.
+
+## Reliable Windows installer and tester feedback — 2026-09-12
+
+- Diagnosed the shared-installer crash from the packaged executable: the build copied PyInstaller's `_internal` runtime directory into a flattened backend folder, so Windows could not load `python312.dll`. The build now creates the destination first and preserves the complete runtime tree.
+- The installed launcher now uses absolute installation paths, creates writable per-user data under `%LOCALAPPDATA%\NEXORA`, selects an available loopback port, waits for `/health` with version and safe-mode checks, prevents duplicate launches, and stops only its own backend child.
+- Added a professional Recovery window with Try Again, Open Diagnostic Folder, Copy Error Report, and Close. Startup logs record UTC timestamp, version, Windows version, stage, and sanitized traceback without API keys or message content.
+- Fresh installs start in Mock Demo mode and copy a non-secret `.env.example` into the user data folder. Uninstall removes program files while leaving chats, settings, logs, feedback, and workspace data in Local AppData.
+- Added a local tester feedback form with five rating levels, confusion/error/liked-feature/next-feature fields, optional sanitized diagnostics, clipboard copy, and JSON file export. No login or network is required.
+- Added `TESTER_INSTRUCTIONS.txt` and `CHANGELOG-v0.2.0.txt`. The new installer includes desktop and Start Menu shortcuts, Readme, tester instructions, and an uninstall entry.
+- Packaged backend smoke test passed from the installed folder: `/health` returned `status=ok`, `version=0.2.0`, `provider_status=demo`, and `safe_mode=true`. Recovery-window smoke test exited successfully. Final offline verification: **117 passed, 1 skipped**; Ruff passed.

@@ -27,6 +27,14 @@ class ConversationWorkspace(Workspace):
         self.pending_assistant_voice = None
         self.pending_wake_phrase = None
         self.pending_creator_website = None
+        self.feedback_values = {
+            "overall_experience": 5,
+            "confusing": "",
+            "error_seen": "",
+            "liked_feature": "",
+            "add_next": "",
+            "attach_diagnostic": False,
+        }
         self.answer_mode = self.state.preferences.get("answer_mode", "medium")
         self.chat_at_bottom = True
         self.gemini_status = ""
@@ -351,6 +359,44 @@ class ConversationWorkspace(Workspace):
         except Exception:
             self.error = "Enter a valid website beginning with http:// or https://"
         self.render()
+
+    def feedback_changed(self, name: str):
+        async def changed(e):
+            value = e.control.value
+            self.feedback_values[name] = int(value) if name == "overall_experience" else value
+
+        return changed
+
+    def feedback_report(self) -> str:
+        values = self.feedback_values
+        rating = int(values["overall_experience"])
+        stars = "★" * rating + "☆" * (5 - rating)
+        return "\n".join(
+            [
+                "NEXORA Tester Feedback",
+                f"Overall experience: {stars} ({rating}/5)",
+                f"Was anything confusing? {values['confusing'] or 'No response'}",
+                f"Did you see an error? {values['error_seen'] or 'No response'}",
+                f"Feature you liked: {values['liked_feature'] or 'No response'}",
+                f"What should NEXORA add next? {values['add_next'] or 'No response'}",
+            ]
+        )
+
+    async def copy_feedback(self, e=None):
+        try:
+            await ft.Clipboard().set(self.feedback_report())
+            self.notify("Feedback copied. You can paste it into WhatsApp or a message.")
+        except Exception:
+            self.error = "Feedback could not be copied. Try Save Feedback File instead."
+            self.render()
+
+    async def save_feedback(self, e=None):
+        try:
+            result = await self.client.request("POST", "/api/v1/feedback", json=self.feedback_values)
+            self.notify(f"Feedback saved as {result['filename']} in your NEXORA feedback folder.")
+        except Exception:
+            self.error = "Feedback could not be saved. Try again."
+            self.render()
 
     def speak_handler(self, message_id):
         async def speak(e=None):
