@@ -302,3 +302,38 @@ async def test_conversation_ui(settings, monkeypatch):
         assert api.state.service.store.get(ui.state.task["id"]).status == "CANCELLED"
         await ui.new_task()
         assert ui.conversation is None
+
+
+@pytest.mark.asyncio
+async def test_five_message_layout_uses_stable_keys(settings, monkeypatch):
+    import httpx
+    from test_ui import PageStub
+
+    from nexora.ui.components.sidebar import sidebar
+    from nexora.ui.conversation_workspace import ConversationWorkspace
+    from nexora.ui.pages.chat import chat
+    from nexora.ui.state import UIState
+
+    api = create_app(settings)
+    real_client = httpx.AsyncClient
+
+    def local_client(**kwargs):
+        kwargs["transport"] = httpx.ASGITransport(app=api)
+        return real_client(**kwargs)
+
+    monkeypatch.setattr("nexora.ui.client.httpx.AsyncClient", local_client)
+    async with api.router.lifespan_context(api):
+        ui = ConversationWorkspace(PageStub(), state=UIState(preference_path=None))
+        await ui.start()
+        for number in range(5):
+            ui.goal.value = f"message {number + 1}"
+            await ui.submit()
+            await asyncio.gather(*list(api.state.chat.running.values()))
+            await ui.sync_chat()
+        assert len(ui.conversation["messages"]) == 10
+        message_list = chat(ui).controls[0]
+        keys = [item.key for item in message_list.controls]
+        assert len(keys) == len(set(keys)) == 10
+        recent_list = sidebar(ui, compact=False).content.controls[4]
+        assert recent_list.key == "recent-chats"
+        assert recent_list.scroll == ft.ScrollMode.AUTO

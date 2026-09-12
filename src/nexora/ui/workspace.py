@@ -27,8 +27,8 @@ class Workspace:
             hint_text="Ask NEXORA anything or give it a goal...",
             multiline=True,
             shift_enter=True,
-            min_lines=3,
-            max_lines=7,
+            min_lines=2,
+            max_lines=4,
             border=ft.InputBorder.NONE,
             on_submit=self.submit,
             text_size=self.text_size,
@@ -129,13 +129,19 @@ class Workspace:
             top = ft.Row(
                 [
                     ft.Text(
-                        title if title != "Chat" else "New Chat",
-                        size=18,
+                        title if title != "Chat" else "New conversation",
+                        size=13,
                         weight=ft.FontWeight.W_600,
                         max_lines=1,
                         overflow=ft.TextOverflow.ELLIPSIS,
                         expand=True,
                     ),
+                    ft.TextButton(
+                        "NEXORA Workspace",
+                        icon=ft.Icons.SPACE_DASHBOARD_OUTLINED,
+                        tooltip="Open plans and activity",
+                        on_click=self.toggle_panel,
+                    ) if screen == "Chat" else ft.Container(),
                     ft.PopupMenuButton(icon=ft.Icons.MORE_HORIZ, tooltip="More", items=more_items),
                 ],
                 spacing=8,
@@ -198,15 +204,15 @@ class Workspace:
         middle = ft.Container(
             ft.Column(center_controls, expand=True, spacing=12),
             expand=True,
-            padding=16 if width < 900 or self.state.preferences["density"] == "Compact" else 26,
+            padding=14 if width < 900 or self.state.preferences["density"] == "Compact" else 20,
         )
         columns = [sidebar(self, compact), middle]
         if self.state.panel_open and width >= 1250 and screen == "Chat":
             columns.append(
                 ft.Container(
                     task_panel(self),
-                    width=310,
-                    padding=18,
+                    width=320,
+                    padding=16,
                     bgcolor=colors["surface"],
                     border=ft.Border.only(left=ft.BorderSide(1, colors["border"])),
                 )

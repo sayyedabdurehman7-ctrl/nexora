@@ -14,20 +14,56 @@ def _simple_task_panel(app) -> ft.Control:
     state, colors, task = app.state, app.colors, app.state.task
     header = ft.Row(
         [
-            ft.Text("Plan and activity", size=17, weight=ft.FontWeight.W_600, expand=True),
+            ft.Text("NEXORA Workspace", size=16, weight=ft.FontWeight.W_600, expand=True),
             ft.IconButton(ft.Icons.CLOSE, tooltip="Close", on_click=app.close_panel),
         ]
     )
+    quick_actions = ft.Column(
+        [
+            ft.Text("Quick Actions", size=12, color=colors["muted"], weight=ft.FontWeight.W_600),
+            ft.TextButton(
+                "Research a topic",
+                icon=ft.Icons.TRAVEL_EXPLORE_OUTLINED,
+                on_click=app.suggestion_handler("Research "),
+            ),
+            ft.TextButton(
+                "Summarize a file",
+                icon=ft.Icons.DESCRIPTION_OUTLINED,
+                on_click=app.suggestion_handler("summarize pdf "),
+            ),
+            ft.TextButton(
+                "Create a task plan",
+                icon=ft.Icons.FORMAT_LIST_NUMBERED,
+                on_click=app.suggestion_handler("Create a plan for "),
+            ),
+            ft.TextButton(
+                "Continue a project",
+                icon=ft.Icons.FOLDER_OPEN_OUTLINED,
+                on_click=app.navigate_handler("Projects"),
+            ),
+        ],
+        spacing=0,
+    )
+    pending = sum(item.get("status") not in TERMINAL for item in state.tasks)
+    saved_context: list[ft.Control] = []
+    if pending:
+        saved_context = [
+            ft.Text("Saved Context", size=12, color=colors["muted"], weight=ft.FontWeight.W_600),
+            ft.Text(f"Pending tasks: {pending}", size=13),
+        ]
     if not task:
         return ft.Column(
             [
                 header,
                 ft.Divider(color=colors["border"]),
-                ft.Icon(ft.Icons.FORMAT_LIST_NUMBERED, size=30, color=PRIMARY),
-                ft.Text("No active task", size=16, weight=ft.FontWeight.W_600),
-                ft.Text("A plan will appear here when your request needs actions.", color=colors["muted"]),
+                ft.Text("Task Pulse", size=12, color=colors["muted"], weight=ft.FontWeight.W_600),
+                ft.Text("No active task", size=14, weight=ft.FontWeight.W_600),
+                ft.Text("Plans and progress appear here when needed.", size=13, color=colors["muted"]),
+                ft.Divider(color=colors["border"]),
+                quick_actions,
+                *([ft.Divider(color=colors["border"]), *saved_context] if saved_context else []),
             ],
-            spacing=14,
+            spacing=10,
         )
     steps = task["plan"]["steps"]
     completed = sum(step["status"] == "COMPLETED" for step in steps)
@@ -39,6 +75,7 @@ def _simple_task_panel(app) -> ft.Control:
     controls = [
         header,
         ft.Divider(color=colors["border"]),
+        ft.Text("Task Pulse", size=12, color=colors["muted"], weight=ft.FontWeight.W_600),
         ft.Text("Current task", size=12, color=colors["muted"], weight=ft.FontWeight.W_600),
         ft.Text(task["user_text"], size=15, weight=ft.FontWeight.W_600),
         ft.Text(simple_status(task["status"]), color=PRIMARY, weight=ft.FontWeight.W_600),
@@ -97,6 +134,9 @@ def _simple_task_panel(app) -> ft.Control:
     if task["status"] not in TERMINAL:
         actions.insert(0, ft.Button("Stop", icon=ft.Icons.STOP_CIRCLE_OUTLINED, on_click=app.stop))
     controls.append(ft.Row(actions, wrap=True))
+    controls.extend([ft.Divider(color=colors["border"]), quick_actions])
+    if saved_context:
+        controls.extend([ft.Divider(color=colors["border"]), *saved_context])
     return ft.Column(
         [
             *controls[:1],

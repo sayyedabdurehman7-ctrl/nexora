@@ -1,167 +1,156 @@
+"""Stable NEXORA navigation and independently scrolling recent chats."""
+
+from pathlib import Path
+
 import flet as ft
 
-from nexora.ui.state import timestamp
-from nexora.ui.theme import PRIMARY
+from nexora.config import application_dir
 
-NAV = [
-    ("Chat", ft.Icons.CHAT_BUBBLE_OUTLINE),
-    ("Projects", ft.Icons.FOLDER_OUTLINED),
-    ("Generated files", ft.Icons.INSERT_DRIVE_FILE_OUTLINED),
-    ("Memory", ft.Icons.BOOKMARK_BORDER),
-    ("Tools", ft.Icons.GRID_VIEW_ROUNDED),
-    ("Task history", ft.Icons.HISTORY),
-    ("Settings", ft.Icons.SETTINGS_OUTLINED),
+FEATURES = [
+    ("Projects", "Projects", ft.Icons.FOLDER_OUTLINED),
+    ("Tasks", "Task history", ft.Icons.CHECKLIST_OUTLINED),
+    ("Research", "Research", ft.Icons.TRAVEL_EXPLORE_OUTLINED),
+    ("Files", "Generated files", ft.Icons.INSERT_DRIVE_FILE_OUTLINED),
+    ("Memory", "Memory", ft.Icons.BOOKMARK_BORDER),
+    ("Tools", "Tools", ft.Icons.GRID_VIEW_ROUNDED),
+    ("Settings", "Settings", ft.Icons.SETTINGS_OUTLINED),
 ]
 
 
-def sidebar(app, compact: bool) -> ft.Control:
-    colors, state = app.colors, app.state
-    controls = [
+def _wordmark(compact: bool) -> ft.Control:
+    source = Path(application_dir()) / "assets" / "NEXORA_Wordmark_White.svg"
+    return ft.Image(
+        src=str(source),
+        width=42 if compact else 150,
+        height=34,
+        fit=ft.BoxFit.CONTAIN,
+        tooltip="NEXORA",
+    )
+
+
+def _nav_button(app, label: str, screen: str, icon, compact: bool) -> ft.Control:
+    selected = app.state.screen == screen
+    content = (
+        ft.IconButton(icon, tooltip=label, on_click=app.navigate_handler(screen))
+        if compact
+        else ft.TextButton(
+            label,
+            icon=icon,
+            tooltip=label,
+            on_click=app.navigate_handler(screen),
+            width=216,
+            style=ft.ButtonStyle(
+                alignment=ft.Alignment.CENTER_LEFT,
+                padding=ft.Padding.symmetric(horizontal=12, vertical=7),
+            ),
+        )
+    )
+    return ft.Container(
+        content,
+        key=f"nav-{screen.lower().replace(' ', '-')}",
+        border_radius=9,
+        bgcolor=app.colors["accent"] if selected else None,
+    )
+
+
+def _chat_row(app, conversation: dict) -> ft.Control:
+    chat_id = conversation["id"]
+    title = (conversation.get("title") or "New conversation").strip()
+    short_title = title if len(title) <= 24 else title[:23].rstrip() + "…"
+    active = bool(app.conversation and app.conversation.get("id") == chat_id)
+    return ft.Container(
         ft.Row(
             [
-                ft.Container(
-                    ft.Text("N", size=23, color="white", weight=ft.FontWeight.BOLD),
-                    bgcolor=PRIMARY,
-                    padding=10,
-                    border_radius=12,
+                ft.TextButton(
+                    short_title,
+                    tooltip=title,
+                    on_click=app.chat_handler(chat_id),
+                    expand=True,
+                    style=ft.ButtonStyle(
+                        alignment=ft.Alignment.CENTER_LEFT,
+                        padding=ft.Padding.symmetric(horizontal=8, vertical=5),
+                    ),
                 ),
-                *([] if compact else [ft.Text("NEXORA", size=20, weight=ft.FontWeight.BOLD)]),
-            ]
+                ft.PopupMenuButton(
+                    icon=ft.Icons.MORE_HORIZ,
+                    tooltip="Chat actions",
+                    icon_size=17,
+                    items=[
+                        ft.PopupMenuItem(
+                            content=ft.Text("Rename"),
+                            icon=ft.Icons.EDIT_OUTLINED,
+                            on_click=app.rename_chat_handler(chat_id, title),
+                        ),
+                        ft.PopupMenuItem(
+                            content=ft.Text("Delete"),
+                            icon=ft.Icons.DELETE_OUTLINE,
+                            on_click=app.delete_chat_handler(chat_id),
+                        ),
+                    ],
+                ),
+            ],
+            spacing=0,
         ),
-        ft.IconButton(ft.Icons.ADD, tooltip="New Task", on_click=app.new_task)
+        key=f"chat-{chat_id}",
+        border_radius=9,
+        bgcolor=app.colors["accent"] if active else None,
+        padding=ft.Padding.only(right=2),
+    )
+
+
+def sidebar(app, compact: bool) -> ft.Control:
+    colors = app.colors
+    header = ft.Container(
+        _wordmark(compact),
+        height=48,
+        alignment=ft.Alignment.CENTER if compact else ft.Alignment.CENTER_LEFT,
+        padding=ft.Padding.only(left=4),
+    )
+    new_chat = (
+        ft.IconButton(ft.Icons.ADD_COMMENT_OUTLINED, tooltip="New Chat", on_click=app.new_task)
         if compact
         else ft.Button(
             "New Chat",
             icon=ft.Icons.ADD,
             on_click=app.new_task,
-            width=220,
-            tooltip="Start a fresh goal",
-        ),
-    ]
-    if hasattr(app, "conversation"):
-        if not compact:
-            controls += [
-                ft.Divider(color=colors["border"]),
-                ft.Text("Recent chats", size=13, color=colors["muted"], weight=ft.FontWeight.W_600),
+            height=40,
+            width=216,
+            tooltip="Start a new conversation",
+        )
+    )
+    feature_controls = [new_chat]
+    feature_controls.extend(_nav_button(app, label, screen, icon, compact) for label, screen, icon in FEATURES)
+
+    controls: list[ft.Control] = [header, ft.Column(feature_controls, spacing=3)]
+    if compact:
+        controls.extend(
+            [
+                ft.Container(expand=True),
+                ft.IconButton(ft.Icons.MENU, tooltip="Expand sidebar", on_click=app.toggle_sidebar),
             ]
-            recent = [
-                ft.Container(
-                    ft.TextButton(
-                        c["title"][:25],
-                        tooltip=c["title"],
-                        on_click=app.chat_handler(c["id"]),
-                        width=218,
-                        style=ft.ButtonStyle(alignment=ft.Alignment.CENTER_LEFT),
-                    ),
-                    border_radius=10,
-                    bgcolor=(
-                        colors["accent"]
-                        if getattr(app, "conversation", None) and app.conversation["id"] == c["id"]
-                        else None
-                    ),
-                )
-                for c in app.conversations[:30]
-            ]
-            controls.append(
-                ft.Column(
-                    recent or [ft.Text("Your chats will appear here.", size=13, color=colors["muted"])],
-                    expand=True,
-                    scroll=ft.ScrollMode.AUTO,
-                )
-            )
-        else:
-            controls.append(ft.Container(expand=True))
-        controls.append(
-            ft.IconButton(
-                ft.Icons.MENU_OPEN,
-                tooltip="Expand sidebar" if compact else "Collapse sidebar",
-                on_click=app.toggle_sidebar,
-            )
-        )
-        return ft.Container(
-            ft.Column(controls, spacing=10, expand=True),
-            width=72 if compact else 250,
-            padding=14,
-            bgcolor=colors["sidebar"],
-        )
-    for name, icon in NAV:
-        controls.append(
-            ft.Container(
-                ft.IconButton(icon, tooltip=name, on_click=app.navigate_handler(name))
-                if compact
-                else ft.TextButton(name, icon=icon, on_click=app.navigate_handler(name), tooltip=name, width=218),
-                bgcolor=colors["accent"] if state.screen == name else None,
-                border_radius=10,
-            )
-        )
-    if not compact:
-        controls += [
-            ft.Divider(color=colors["border"]),
-            ft.Text("RECENT CONVERSATIONS", size=10, color=colors["muted"]),
-            ft.TextField(
-                hint_text="Search chats",
-                prefix_icon=ft.Icons.SEARCH,
-                value=state.search,
-                dense=True,
-                on_change=app.search_changed,
-            ),
-        ]
-        recent = []
-        for task in [] if hasattr(app, "conversations") else state.filtered_tasks()[:20]:
-            active = state.task and state.task["id"] == task["id"]
-            recent.append(
-                ft.Container(
-                    ft.Column(
-                        [
-                            ft.TextButton(
-                                task["user_text"][:32],
-                                on_click=app.open_handler(task["id"]),
-                                tooltip=task["user_text"][:200],
-                            ),
-                            ft.Text(
-                                timestamp(task.get("ended_at") or task["created_at"]),
-                                size=10,
-                                color=colors["muted"],
-                            ),
-                        ],
-                        spacing=0,
-                    ),
-                    padding=6,
-                    border_radius=10,
-                    bgcolor=colors["accent"] if active else None,
-                )
-            )
-        if hasattr(app, "conversations"):
-            recent = [
-                ft.TextButton(c["title"][:32], tooltip=c["title"], on_click=app.chat_handler(c["id"]))
-                for c in app.conversations
-                if state.search.lower() in c["title"].lower()
-            ][:20]
-        controls.append(
-            ft.Column(
-                recent or [ft.Text("Your tasks will appear here.", size=12, color=colors["muted"])],
-                expand=True,
-                scroll=ft.ScrollMode.AUTO,
-            )
         )
     else:
-        controls.append(ft.Container(expand=True))
-    controls += [
-        ft.IconButton(
-            ft.Icons.MENU_OPEN,
-            tooltip="Expand sidebar" if compact else "Collapse sidebar",
-            on_click=app.toggle_sidebar,
-        ),
-        ft.Row(
+        conversations = getattr(app, "conversations", [])[:40]
+        recent = [_chat_row(app, item) for item in conversations]
+        controls.extend(
             [
-                ft.CircleAvatar(content=ft.Text("L"), radius=15, bgcolor=colors["accent"]),
-                *([] if compact else [ft.Text("Local workspace\nPersonal · no account", size=11)]),
+                ft.Divider(color=colors["border"], height=16),
+                ft.Text("Recent Chats", size=12, color=colors["muted"], weight=ft.FontWeight.W_600),
+                ft.Column(
+                    recent or [ft.Text("Your conversations will appear here.", size=12, color=colors["muted"])],
+                    key="recent-chats",
+                    expand=True,
+                    scroll=ft.ScrollMode.AUTO,
+                    spacing=2,
+                ),
+                ft.IconButton(ft.Icons.MENU_OPEN, tooltip="Collapse sidebar", on_click=app.toggle_sidebar),
             ]
-        ),
-    ]
+        )
     return ft.Container(
-        ft.Column(controls, spacing=8, expand=True),
-        width=76 if compact else 250,
-        padding=14,
+        ft.Column(controls, key="sidebar-content", spacing=8, expand=True),
+        key="nexora-sidebar",
+        width=68 if compact else 248,
+        padding=ft.Padding.symmetric(horizontal=12, vertical=10),
         bgcolor=colors["sidebar"],
+        border=ft.Border.only(right=ft.BorderSide(1, colors["border"])),
     )

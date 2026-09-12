@@ -49,6 +49,7 @@ def _conversation_message(app, message: dict) -> ft.Control:
                 width=min(700, (app.page.width or 1000) * 0.68),
             ),
             alignment=ft.Alignment.CENTER_RIGHT,
+            key=f"message-{message['id']}",
         )
 
     text, status_text = _message_text(app, message)
@@ -94,21 +95,7 @@ def _conversation_message(app, message: dict) -> ft.Control:
             )
         )
 
-    body: list[ft.Control] = [
-        ft.Row(
-            [
-                ft.Container(
-                    ft.Text("N", color="white", size=12, weight=ft.FontWeight.BOLD),
-                    bgcolor=PRIMARY,
-                    width=28,
-                    height=28,
-                    border_radius=14,
-                    alignment=ft.Alignment.CENTER,
-                ),
-                ft.Text("NEXORA", size=13, weight=ft.FontWeight.W_600),
-            ]
-        )
-    ]
+    body: list[ft.Control] = [ft.Text("NEXORA", size=12, weight=ft.FontWeight.W_600, color=colors["muted"])]
     if status_text:
         body.append(
             ft.Row(
@@ -141,7 +128,11 @@ def _conversation_message(app, message: dict) -> ft.Control:
         )
     if action_controls:
         body.append(ft.Row(action_controls, wrap=True, spacing=6))
-    return ft.Container(ft.Column(body, spacing=12), padding=ft.Padding.symmetric(horizontal=8, vertical=10))
+    return ft.Container(
+        ft.Column(body, spacing=10),
+        padding=ft.Padding.symmetric(horizontal=8, vertical=10),
+        key=f"message-{message['id']}",
+    )
 
 
 def chat(app) -> ft.Control:
@@ -157,14 +148,6 @@ def chat(app) -> ft.Control:
             ft.Container(
                 ft.Column(
                     [
-                        ft.Container(
-                            ft.Text("N", color="white", size=24, weight=ft.FontWeight.BOLD),
-                            bgcolor=PRIMARY,
-                            width=54,
-                            height=54,
-                            border_radius=18,
-                            alignment=ft.Alignment.CENTER,
-                        ),
                         ft.Text("How can I help you today?", size=28, weight=ft.FontWeight.W_600),
                         ft.Text(
                             "Ask a question, talk through a problem, or give NEXORA a task.",

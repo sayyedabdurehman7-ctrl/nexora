@@ -29,15 +29,21 @@ Copy-Item -Path (Join-Path $out 'ui\NEXORA\*') -Destination $dist -Recurse -Forc
 Copy-Item -Path (Join-Path $out 'backend\NexoraBackend\*') -Destination (Join-Path $dist 'backend') -Recurse -Force
 Copy-Item -LiteralPath '.env.example' -Destination (Join-Path $dist '.env.example') -Force
 Copy-Item -LiteralPath 'README.md' -Destination (Join-Path $dist 'README.md') -Force
+Copy-Item -LiteralPath 'assets' -Destination (Join-Path $dist 'assets') -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'launch-installed.ps1') -Destination (Join-Path $dist 'launch-installed.ps1') -Force
 New-Item -ItemType Directory -Path (Join-Path $dist 'data') -Force | Out-Null
 
 if (!$PortableOnly) {
     $iscc = Get-Command iscc -ErrorAction SilentlyContinue
     if ($null -eq $iscc) {
+        $localIscc = Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'
+        if (Test-Path -LiteralPath $localIscc) { $iscc = Get-Item -LiteralPath $localIscc }
+    }
+    if ($null -eq $iscc) {
         Write-Warning 'Inno Setup compiler (iscc.exe) was not found. Portable files were created; install Inno Setup and rerun with -PortableOnly:$false.'
     } else {
-        & $iscc.Source (Join-Path $PSScriptRoot 'NEXORA.iss')
+        $isccPath = if ($iscc.Source) { $iscc.Source } else { $iscc.FullName }
+        & $isccPath (Join-Path $PSScriptRoot 'NEXORA.iss')
         if ($LASTEXITCODE -ne 0) { throw 'Inno Setup failed.' }
     }
 }

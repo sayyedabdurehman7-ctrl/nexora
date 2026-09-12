@@ -2,18 +2,18 @@
 
 import flet as ft
 
-PRIMARY = "#5265DC"
+PRIMARY = "#596FE8"
 
 
 def palette(dark: bool) -> dict[str, str]:
     return {
-        "bg": "#111827" if dark else "#FAFBFE",
-        "surface": "#182235" if dark else "#FFFFFF",
-        "sidebar": "#131D2E" if dark else "#F0F3FA",
-        "text": "#E9EEF9" if dark else "#202C46",
-        "muted": "#A8B6CC" if dark else "#64738D",
-        "border": "#2E3D55" if dark else "#E1E7F1",
-        "accent": "#273754" if dark else "#E9EDFF",
+        "bg": "#0B0B0D" if dark else "#F7F7F8",
+        "surface": "#17191F" if dark else "#FFFFFF",
+        "sidebar": "#101114" if dark else "#ECEEF2",
+        "text": "#F4F4F5" if dark else "#17181C",
+        "muted": "#A7AAB2" if dark else "#666B76",
+        "border": "#2A2D34" if dark else "#DDE0E6",
+        "accent": "#20232A" if dark else "#E9ECF8",
     }
 
 
@@ -31,7 +31,7 @@ def card(content: ft.Control, colors: dict, **kwargs) -> ft.Container:
         content,
         padding=18,
         bgcolor=colors["surface"],
-        border_radius=16,
+        border_radius=12,
         border=ft.Border.all(1, colors["border"]),
         **kwargs,
     )

@@ -52,7 +52,7 @@ def _modern_composer(app, active: bool) -> ft.Control:
         ],
     )
     controls = [
-        app.goal,
+        ft.Container(height=0, visible=False),
         ft.Row(
             [
                 ft.IconButton(
@@ -67,7 +67,7 @@ def _modern_composer(app, active: bool) -> ft.Control:
                     icon_color="#D94B59" if voice.get("phase") == "recording" else None,
                 ),
                 mode_menu,
-                ft.Container(expand=True),
+                ft.Container(app.goal, expand=True),
                 ft.Button(
                     "Stop",
                     icon=ft.Icons.STOP_CIRCLE_OUTLINED,
@@ -86,7 +86,8 @@ def _modern_composer(app, active: bool) -> ft.Control:
                     tooltip="Send message",
                 ),
             ],
-            spacing=6,
+            spacing=4,
+            vertical_alignment=ft.CrossAxisAlignment.END,
         ),
     ]
     if voice_status:
@@ -106,8 +107,8 @@ def _modern_composer(app, active: bool) -> ft.Control:
     controls.append(ft.Text("Enter to send · Shift+Enter for a new line", size=12, color=colors["muted"]))
     return ft.Container(
         ft.Column(controls, spacing=5),
-        padding=ft.Padding.symmetric(horizontal=14, vertical=10),
-        border_radius=18,
+        padding=ft.Padding.symmetric(horizontal=10, vertical=8),
+        border_radius=14,
         bgcolor=colors["surface"],
         border=ft.Border.all(1, colors["border"]),
     )

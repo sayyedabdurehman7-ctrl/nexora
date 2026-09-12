@@ -1,7 +1,7 @@
 """Local-only FastAPI adapter. Business logic lives in Service."""
 
-from contextlib import asynccontextmanager
 import os
+from contextlib import asynccontextmanager
 from typing import Literal
 from uuid import uuid4
 
@@ -37,7 +37,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         service.store.engine.dispose()
 
     app = FastAPI(title="NEXORA", lifespan=lifespan)
-    hosts = [h.strip() for h in os.getenv("NEXORA_ALLOWED_HOSTS", "127.0.0.1,localhost,testserver").split(",") if h.strip()]
+    host_setting = os.getenv("NEXORA_ALLOWED_HOSTS", "127.0.0.1,localhost,testserver")
+    hosts = [host.strip() for host in host_setting.split(",") if host.strip()]
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts)
 
     @app.middleware("http")
@@ -208,7 +209,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
 
 def main() -> None:
-    uvicorn.run("nexora.api.app:create_app", factory=True, host=os.getenv("HOST", "127.0.0.1"), port=int(os.getenv("PORT", "8000")), access_log=False)
+    uvicorn.run(
+        "nexora.api.app:create_app",
+        factory=True,
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "8000")),
+        access_log=False,
+    )
 
 
 if __name__ == "__main__":

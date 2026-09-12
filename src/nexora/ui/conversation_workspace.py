@@ -378,6 +378,55 @@ class ConversationWorkspace(Workspace):
             ft.AlertDialog(title=ft.Text("Rename chat"), content=title, actions=[ft.Button("Save", on_click=save)])
         )
 
+    def rename_chat_handler(self, chat_id: str, current_title: str):
+        async def rename(e=None):
+            title = ft.TextField(label="Chat title", value=current_title, max_length=80)
+
+            async def save(event=None):
+                try:
+                    updated = await self.client.request(
+                        "PATCH", f"/api/v1/conversations/{chat_id}", json={"text": title.value}
+                    )
+                    if self.conversation and self.conversation.get("id") == chat_id:
+                        self.conversation = updated
+                    self.page.pop_dialog()
+                    await self.refresh()
+                except Exception:
+                    self.error = "Could not rename this conversation. Try again."
+                self.render()
+
+            self.page.show_dialog(
+                ft.AlertDialog(title=ft.Text("Rename chat"), content=title, actions=[ft.Button("Save", on_click=save)])
+            )
+
+        return rename
+
+    def delete_chat_handler(self, chat_id: str):
+        async def confirm(e=None):
+            async def remove(event=None):
+                try:
+                    await self.client.request("DELETE", f"/api/v1/conversations/{chat_id}")
+                    self.page.pop_dialog()
+                    if self.conversation and self.conversation.get("id") == chat_id:
+                        await self.new_task()
+                    await self.refresh()
+                except Exception:
+                    self.error = "Could not delete this conversation. Try again."
+                self.render()
+
+            self.page.show_dialog(
+                ft.AlertDialog(
+                    title=ft.Text("Delete this conversation?"),
+                    content=ft.Text("Its saved messages will be removed."),
+                    actions=[
+                        ft.TextButton("Keep", on_click=lambda event: self.page.pop_dialog()),
+                        ft.Button("Delete", on_click=remove),
+                    ],
+                )
+            )
+
+        return confirm
+
     async def delete_chat(self, e=None):
         if not self.conversation:
             return

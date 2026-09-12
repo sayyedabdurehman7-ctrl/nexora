@@ -1,5 +1,15 @@
 # Progress
 
+## Professional black workspace redesign — 2026-09-12
+
+- Added the white `assets/NEXORA_Wordmark_White.svg` brand wordmark and removed the old blue-square mark from the chat experience.
+- Reworked the dark palette to near-black, charcoal surfaces, subtle gray borders, and a restrained indigo primary action.
+- Split the sidebar into fixed feature navigation and an independently scrolling Recent Chats area. Chat and message rows now have stable keys, short titles, active highlighting, and working rename/delete menus.
+- Reduced the composer to a compact single-row layout with Attach, Microphone, answer mode, expandable message field, Stop, and Send controls.
+- Added the collapsed-by-default NEXORA Workspace panel with Task Pulse, working quick actions, real task progress, and real pending-task context only.
+- Reduced the chat title to a small top-bar label and removed the old assistant icon from empty and reply states.
+- Verification: Ruff passes; **105 passed, 1 skipped**. The five-message regression check confirms unique stable message keys and independent Recent Chats scrolling. Responsive control-tree rendering covers 1440×900, 900×650, and 640×550. Native screenshot capture was unavailable in this session.
+
 ## NEXORA identity policy and provider privacy — 2026-09-11
 
 - Added one central identity policy to every online AI request. NEXORA now identifies itself
