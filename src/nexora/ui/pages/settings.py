@@ -23,6 +23,11 @@ def settings(app) -> ft.Control:
         else values.get("assistant_voice_enabled", False)
     )
     wake_phrase = getattr(app, "pending_wake_phrase", None) or values.get("wake_phrase", "Hey NEXORA")
+    creator_website = (
+        app.pending_creator_website
+        if getattr(app, "pending_creator_website", None) is not None
+        else values.get("creator_website", "")
+    )
     content = ft.Column(
         [
             ft.Text("AI Settings", size=28, weight=ft.FontWeight.W_600),
@@ -152,6 +157,43 @@ def settings(app) -> ft.Control:
                         ),
                     ],
                     spacing=16,
+                ),
+                colors,
+            ),
+            ft.Row(
+                [
+                    ft.Text("About", size=20, weight=ft.FontWeight.W_600, expand=True),
+                    ft.TextButton(
+                        "About this project",
+                        icon=ft.Icons.INFO_OUTLINE,
+                        on_click=app.navigate_handler("About NEXORA"),
+                    ),
+                ]
+            ),
+            card(
+                ft.Column(
+                    [
+                        ft.TextField(
+                            label="Creator website",
+                            value=creator_website,
+                            hint_text="https://your-website-link.com",
+                            on_change=getattr(app, "creator_website_changed", None),
+                            width=460,
+                        ),
+                        ft.Text(
+                            "The link appears in About responses only after you save a valid URL.",
+                            size=12,
+                            color=colors["muted"],
+                        ),
+                        ft.Button(
+                            "Save About settings",
+                            icon=ft.Icons.SAVE_OUTLINED,
+                            on_click=getattr(app, "save_about_settings", None),
+                            color="white",
+                            bgcolor=PRIMARY,
+                        ),
+                    ],
+                    spacing=12,
                 ),
                 colors,
             ),

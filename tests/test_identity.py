@@ -9,6 +9,7 @@ from nexora.identity import (
     NEXORA_INTRODUCTION,
     NEXORA_PROJECT_DESCRIPTION,
     SAFE_IDENTITY_FALLBACK,
+    nexora_about,
     violates_identity,
 )
 
@@ -16,7 +17,8 @@ from nexora.identity import (
 async def ask(chat: ConversationService, question: str) -> str:
     conversation = chat.create()
     chat.send(conversation.id, question)
-    await chat.running[conversation.id]
+    if conversation.id in chat.running:
+        await chat.running[conversation.id]
     return chat.store.get(conversation.id).messages[-1].content
 
 
@@ -27,6 +29,9 @@ async def ask(chat: ConversationService, question: str) -> str:
         ("Who are you?", NEXORA_INTRODUCTION),
         ("What is NEXORA?", NEXORA_PROJECT_DESCRIPTION),
         ("Tell me about this platform.", NEXORA_PROJECT_DESCRIPTION),
+        ("Who developed NEXORA?", NEXORA_PROJECT_DESCRIPTION),
+        ("Who created you?", NEXORA_PROJECT_DESCRIPTION),
+        ("Tell me about this project.", NEXORA_PROJECT_DESCRIPTION),
         ("Are you Gemini?", "No. " + NEXORA_INTRODUCTION),
         ("Are you a chatbot?", "No. " + NEXORA_INTRODUCTION),
     ],
@@ -44,6 +49,26 @@ async def test_provider_question_is_honest_without_changing_nexora_identity(serv
     assert "Gemini API" in answer
     assert "NEXORA itself is your personal AI workspace" in answer
     assert not violates_identity(answer, question)
+
+
+@pytest.mark.asyncio
+async def test_about_response_includes_only_valid_saved_website(service):
+    service.settings.creator_website = "https://example.com/creator"
+    answer = await ask(ConversationService(service), "Who created you?")
+    assert answer == nexora_about("https://example.com/creator")
+    assert "Sayed Abdur Rehman" in answer
+
+
+def test_about_settings_validate_and_persist(settings):
+    app = create_app(settings)
+    with TestClient(app) as client:
+        saved = client.patch(
+            "/api/v1/settings/about", json={"creator_website": "https://example.com/nexora#private"}
+        )
+        assert saved.status_code == 200
+        assert saved.json()["creator_website"] == "https://example.com/nexora"
+        assert app.state.service.store.get_setting("creator_website") == "https://example.com/nexora"
+        assert client.patch("/api/v1/settings/about", json={"creator_website": "not a url"}).status_code == 422
 
 
 class ScriptedProvider:

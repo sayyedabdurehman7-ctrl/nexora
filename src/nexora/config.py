@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from nexora.identity import normalize_creator_website
+
 
 def application_dir() -> Path:
     """Return the launcher folder without depending on the process working directory."""
@@ -36,6 +38,7 @@ class Settings(BaseSettings):
     llm_provider: Literal["gemini", "mock"] = "mock"
     gemini_api_key: SecretStr = SecretStr("")
     gemini_model: str = ""
+    creator_website: str = ""
     voice_mode: Literal["off", "push_to_talk", "wake_word"] = "push_to_talk"
     assistant_voice_enabled: bool = False
     wake_phrase: str = "Hey NEXORA"
@@ -60,6 +63,11 @@ class Settings(BaseSettings):
         if isinstance(value, SecretStr):
             value = value.get_secret_value()
         return str(value or "").strip().strip("\"'").strip()
+
+    @field_validator("creator_website")
+    @classmethod
+    def validate_creator_website(cls, value: str) -> str:
+        return normalize_creator_website(value)
 
     @field_validator("voice_mode", mode="before")
     @classmethod

@@ -5,6 +5,7 @@
 __pycache__/
 *.egg-info/
 .pytest_cache/
+.test-tmp-run/
 .ruff_cache/
 data/
 logs/

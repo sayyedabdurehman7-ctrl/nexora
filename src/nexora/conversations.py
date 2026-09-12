@@ -9,7 +9,14 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from nexora.core import Conflict
 from nexora.db import Base, Store
-from nexora.identity import IDENTITY_REWRITE_REQUEST, SAFE_IDENTITY_FALLBACK, is_identity_question, violates_identity
+from nexora.identity import (
+    IDENTITY_REWRITE_REQUEST,
+    SAFE_IDENTITY_FALLBACK,
+    is_about_question,
+    is_identity_question,
+    nexora_about,
+    violates_identity,
+)
 from nexora.models import StrictModel, new_id, now
 from nexora.providers import (
     NO_LIVE_SOURCES,
@@ -150,6 +157,17 @@ class ConversationService:
         if not conversation.messages:
             conversation.title = text[:60]
         conversation.messages.append(Message(role="user", content=text, answer_mode=answer_mode))
+        if is_about_question(text):
+            conversation.messages.append(
+                Message(
+                    role="assistant",
+                    content=nexora_about(self.tasks.settings.creator_website),
+                    status="completed",
+                    answer_mode=answer_mode,
+                )
+            )
+            self.store.save(conversation)
+            return conversation
         lower = text.lower()
         action = lower.startswith(
             (

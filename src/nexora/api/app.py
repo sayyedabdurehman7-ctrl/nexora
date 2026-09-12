@@ -9,13 +9,14 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from nexora.config import Settings, gemini_key_diagnostic, load_settings
 from nexora.conversations import ConversationService
 from nexora.core import Conflict, Service
 from nexora.db import Store
+from nexora.identity import normalize_creator_website
 from nexora.models import GoalInput
 from nexora.providers import GeminiProvider
 from nexora.voice import VoiceService
@@ -25,7 +26,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         config = settings or load_settings()
-        service = Service(config, Store(config.database_url))
+        store = Store(config.database_url)
+        stored_website = store.get_setting("creator_website")
+        if stored_website is not None:
+            config.creator_website = stored_website
+        service = Service(config, store)
         service.recover_interrupted()
         app.state.service = service
         app.state.chat = ConversationService(service)
@@ -101,6 +106,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "provider": config.llm_provider,
             "gemini_key_status": "Configured" if config.gemini_api_key.get_secret_value() else "Not Configured",
             "gemini_model": config.gemini_model,
+            "creator_website": config.creator_website,
             "voice_mode": config.voice_mode,
             "assistant_voice_enabled": config.assistant_voice_enabled,
             "wake_phrase": config.wake_phrase,
@@ -138,6 +144,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         config = request.app.state.service.settings
         provider = GeminiProvider(config.gemini_api_key.get_secret_value(), body.model.strip() or config.gemini_model)
         return await provider.test_connection()
+
+    class AboutSettingsInput(BaseModel):
+        creator_website: str = Field(default="", max_length=500)
+
+        @field_validator("creator_website")
+        @classmethod
+        def valid_website(cls, value: str) -> str:
+            return normalize_creator_website(value)
+
+    @app.patch("/api/v1/settings/about")
+    async def save_about_settings(body: AboutSettingsInput, request: Request):
+        config = request.app.state.service.settings
+        config.creator_website = body.creator_website
+        request.app.state.service.store.set_setting("creator_website", body.creator_website)
+        return {"creator_website": body.creator_website}
 
     @app.post("/api/v1/tasks", status_code=201)
     async def create_goal(body: GoalInput, request: Request):

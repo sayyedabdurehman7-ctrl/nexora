@@ -7,6 +7,7 @@ import flet as ft
 from nexora.config import application_dir
 
 FEATURES = [
+    ("About NEXORA", "About NEXORA", ft.Icons.INFO_OUTLINE),
     ("Projects", "Projects", ft.Icons.FOLDER_OUTLINED),
     ("Tasks", "Task history", ft.Icons.CHECKLIST_OUTLINED),
     ("Research", "Research", ft.Icons.TRAVEL_EXPLORE_OUTLINED),
@@ -153,4 +154,5 @@ def sidebar(app, compact: bool) -> ft.Control:
         padding=ft.Padding.symmetric(horizontal=12, vertical=10),
         bgcolor=colors["sidebar"],
         border=ft.Border.only(right=ft.BorderSide(1, colors["border"])),
+        clip_behavior=ft.ClipBehavior.HARD_EDGE,
     )

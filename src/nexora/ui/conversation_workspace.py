@@ -26,6 +26,7 @@ class ConversationWorkspace(Workspace):
         self.pending_voice_mode = None
         self.pending_assistant_voice = None
         self.pending_wake_phrase = None
+        self.pending_creator_website = None
         self.answer_mode = self.state.preferences.get("answer_mode", "medium")
         self.chat_at_bottom = True
         self.gemini_status = ""
@@ -197,7 +198,7 @@ class ConversationWorkspace(Workspace):
         return select
 
     async def chat_scroll(self, e):
-        self.chat_at_bottom = e.pixels >= e.max_scroll_extent - 80
+        self.chat_at_bottom = e.pixels >= e.max_scroll_extent - 100
 
     async def voice_mode_changed(self, e):
         selected = e.control.value or "push_to_talk"
@@ -328,6 +329,27 @@ class ConversationWorkspace(Workspace):
             self.error = ""
         except Exception:
             self.gemini_status = "Gemini API error"
+        self.render()
+
+    async def creator_website_changed(self, e):
+        self.pending_creator_website = e.control.value or ""
+
+    async def save_about_settings(self, e=None):
+        website = (
+            self.pending_creator_website
+            if self.pending_creator_website is not None
+            else self.state.settings.get("creator_website", "")
+        )
+        try:
+            result = await self.client.request(
+                "PATCH", "/api/v1/settings/about", json={"creator_website": website}
+            )
+            self.state.settings.update(result)
+            self.pending_creator_website = None
+            self.error = ""
+            self.notify("About settings saved.")
+        except Exception:
+            self.error = "Enter a valid website beginning with http:// or https://"
         self.render()
 
     def speak_handler(self, message_id):

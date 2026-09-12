@@ -42,6 +42,12 @@ class MemoryRecord(Base):
     updated_at: Mapped[str] = mapped_column(String)
 
 
+class SettingRecord(Base):
+    __tablename__ = "app_settings"
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    value: Mapped[str] = mapped_column(Text)
+
+
 class Store:
     def __init__(self, url: str):
         filename = url.removeprefix("sqlite:///")
@@ -49,6 +55,15 @@ class Store:
             Path(filename).parent.mkdir(parents=True, exist_ok=True)
         self.engine = create_engine(url, connect_args={"check_same_thread": False})
         Base.metadata.create_all(self.engine)
+
+    def get_setting(self, key: str) -> str | None:
+        with Session(self.engine) as session:
+            record = session.get(SettingRecord, key)
+            return record.value if record else None
+
+    def set_setting(self, key: str, value: str) -> None:
+        with Session(self.engine) as session, session.begin():
+            session.merge(SettingRecord(key=key, value=value))
 
     def save(self, task: TaskRun, message: str, correlation_id: str = "") -> None:
         # Only fixed event messages; file contents, goals and credentials are not logs.

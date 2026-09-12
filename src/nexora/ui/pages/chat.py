@@ -126,12 +126,22 @@ def _conversation_message(app, message: dict) -> ft.Control:
                 on_tap_link=app.source_link,
             )
         )
+    action_row = None
     if action_controls:
-        body.append(ft.Row(action_controls, wrap=True, spacing=6))
+        action_row = ft.Row(action_controls, wrap=True, spacing=6, opacity=0)
+        body.append(action_row)
+
+    def show_actions(e):
+        if action_row is None:
+            return
+        action_row.opacity = 1 if str(e.data).lower() == "true" else 0
+        action_row.update()
+
     return ft.Container(
         ft.Column(body, spacing=10),
         padding=ft.Padding.symmetric(horizontal=8, vertical=10),
         key=f"message-{message['id']}",
+        on_hover=show_actions if action_row else None,
     )
 
 

@@ -1,13 +1,16 @@
 """Central NEXORA identity policy and reply safety checks."""
 
 import re
+from urllib.parse import urlsplit, urlunsplit
 
 NEXORA_INTRODUCTION = (
     "I am NEXORA, your personal AI workspace. I can help you discuss ideas, plan tasks, "
     "organize work, answer questions, and complete approved actions."
 )
 NEXORA_PROJECT_DESCRIPTION = (
-    "A goal-based personal AI workspace that helps users plan, organize, research, create, and verify tasks."
+    "NEXORA is an autonomous multimodal personal AI agent developed by Sayed Abdur Rehman as a final-year "
+    "Computer Science project. It is designed to help users turn goals into clear plans, use selected tools "
+    "safely, verify results, and work through text or voice. NEXORA is currently in development."
 )
 SAFE_IDENTITY_FALLBACK = "I am NEXORA, your personal AI workspace. Please ask your question again."
 
@@ -31,7 +34,9 @@ When a user asks, “What are you?”, reply:
 questions, and complete approved actions.”
 
 When the user asks about the NEXORA project, explain NEXORA as:
-“A goal-based personal AI workspace that helps users plan, organize, research, create, and verify tasks.”
+“NEXORA is an autonomous multimodal personal AI agent developed by Sayed Abdur Rehman as a final-year Computer
+Science project. It is designed to help users turn goals into clear plans, use selected tools safely, verify
+results, and work through text or voice. NEXORA is currently in development.”
 
 Use clear, confident and simple English."""
 
@@ -42,7 +47,7 @@ IDENTITY_REWRITE_REQUEST = (
 )
 
 _SERVICE_TERMS = re.compile(
-    r"\b(gemini|openai|chatgpt|google|claude|anthropic|copilot|ollama|llama|language model|chatbot|ai model|"
+    r"\b(gemini|openai|chatgpt|google|claude|anthropic|copilot|llama|language model|chatbot|ai model|"
     r"external ai provider|artificial intelligence|large language model|powered by)\b",
     re.IGNORECASE,
 )
@@ -56,7 +61,7 @@ _FALSE_SELF_IDENTIFICATION = re.compile(
     re.IGNORECASE,
 )
 _PROVIDER_QUESTION = re.compile(
-    r"\b(gemini|openai|chatgpt|google|claude|anthropic|copilot|ollama|llama|ai service|ai provider|"
+    r"\b(gemini|openai|chatgpt|google|claude|anthropic|copilot|llama|ai service|ai provider|"
     r"backend service|language model|chatbot|what model|which model|artificial intelligence|ai)\b",
     re.IGNORECASE,
 )
@@ -76,7 +81,42 @@ def is_identity_question(user_text: str) -> bool:
         "what is nexora",
         "tell me about nexora",
         "tell me about this platform",
+        "who developed nexora",
+        "who created you",
+        "who created nexora",
+        "tell me about this project",
     }
+
+
+def is_about_question(user_text: str) -> bool:
+    """Return whether the user requested the approved project or creator introduction."""
+    normalized = re.sub(r"[^a-z0-9 ]+", "", user_text.lower()).strip()
+    return normalized in {
+        "what is nexora",
+        "tell me about nexora",
+        "tell me about this platform",
+        "tell me about this project",
+        "who developed nexora",
+        "who created nexora",
+        "who created you",
+    }
+
+
+def normalize_creator_website(value: str) -> str:
+    """Return a safe HTTP(S) website URL or raise ValueError."""
+    value = (value or "").strip()
+    if not value:
+        return ""
+    parsed = urlsplit(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
+        raise ValueError("Enter a valid website beginning with http:// or https://")
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, parsed.query, ""))
+
+
+def nexora_about(creator_website: str = "") -> str:
+    """Build the approved About response with an optional validated creator link."""
+    website = normalize_creator_website(creator_website)
+    return NEXORA_PROJECT_DESCRIPTION + (f"\n\nCreator website: {website}" if website else "")
 
 
 def violates_identity(reply: str, user_text: str) -> bool:

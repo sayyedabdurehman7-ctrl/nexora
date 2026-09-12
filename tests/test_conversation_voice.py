@@ -1,4 +1,5 @@
 import asyncio
+from types import SimpleNamespace
 
 import flet as ft
 import pytest
@@ -337,3 +338,56 @@ async def test_five_message_layout_uses_stable_keys(settings, monkeypatch):
         recent_list = sidebar(ui, compact=False).content.controls[4]
         assert recent_list.key == "recent-chats"
         assert recent_list.scroll == ft.ScrollMode.AUTO
+
+
+@pytest.mark.asyncio
+async def test_large_chat_keeps_stable_shell_and_scroll_policy(settings, monkeypatch):
+    import httpx
+    from test_ui import PageStub
+
+    from nexora.ui.conversation_workspace import ConversationWorkspace
+    from nexora.ui.pages.chat import chat
+    from nexora.ui.state import UIState
+
+    api = create_app(settings)
+    real_client = httpx.AsyncClient
+
+    def local_client(**kwargs):
+        kwargs["transport"] = httpx.ASGITransport(app=api)
+        return real_client(**kwargs)
+
+    monkeypatch.setattr("nexora.ui.client.httpx.AsyncClient", local_client)
+    async with api.router.lifespan_context(api):
+        ui = ConversationWorkspace(PageStub(), state=UIState(preference_path=None))
+        await ui.start()
+        ui.conversation = {
+            "id": "large-chat",
+            "title": "Long conversation",
+            "messages": [
+                {
+                    "id": f"message-{number}",
+                    "role": "user" if number % 2 == 0 else "assistant",
+                    "content": ("A long response paragraph. " * 30) if number == 59 else f"Message {number}",
+                    "status": "completed",
+                    "answer_mode": "medium",
+                }
+                for number in range(60)
+            ],
+        }
+        ui.chat_at_bottom = False
+        rendered = chat(ui)
+        message_list, rendered_composer = rendered.controls
+        keys = [item.key for item in message_list.controls]
+        assert len(keys) == len(set(keys)) == 60
+        assert message_list.auto_scroll is False
+        assert rendered_composer is rendered.controls[-1]
+
+        ui.render()
+        stable_sidebar = ui._sidebar_control
+        ui.render()
+        assert ui._sidebar_control is stable_sidebar
+
+        await ui.chat_scroll(SimpleNamespace(pixels=890, max_scroll_extent=1000))
+        assert ui.chat_at_bottom is False
+        await ui.chat_scroll(SimpleNamespace(pixels=901, max_scroll_extent=1000))
+        assert ui.chat_at_bottom is True

@@ -141,3 +141,13 @@ exora.web_app:app to serve FastAPI and Flet together for a hosted service.
 - Verified hosted entrypoint imports successfully. Full pytest run is blocked by Windows temp-folder permissions in this workspace (38 passed, 67 setup errors).
 - Added Hugging Face Docker Space metadata and deployment instructions as a no-card alternative.
 - Built a complete per-user Windows installer at `installer/output/NEXORA-Setup.exe` using Inno Setup 6.7.3.
+
+## Stable chat shell and About NEXORA — 2026-09-12
+
+- Kept the app shell at the viewport boundary and clipped outer overflow. The sidebar has a stable cached control tree, while Recent Chats and the message history keep independent scroll areas.
+- Preserved stable chat and message keys. Idle polling skips unchanged snapshots, token chunks are merged in the backend, and the UI receives one assistant placeholder followed by one final update instead of repainting for every token.
+- Auto-scroll now activates only while the user is within 100 pixels of the newest message. A user reading older messages is not forced back to the bottom.
+- Reduced the normal composer to a one-line input that expands only for multiline prompts. Attach, microphone, answer mode, input, and Send remain in one compact rounded bar.
+- Added About NEXORA navigation, the approved project and creator introduction, and a validated optional Creator website setting stored in SQLite. Invalid or invented links are never shown.
+- Added regression coverage for 60-message conversations, long answer text, unique stable keys, scroll policy, stable sidebar reuse, About prompts, creator-link validation, and saved About settings.
+- Verification: Ruff passed and the offline suite completed with **115 passed, 1 skipped**. The skipped check requires Windows symlink privileges.

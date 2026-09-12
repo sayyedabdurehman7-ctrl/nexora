@@ -72,7 +72,8 @@ async def test_flet_controls_and_callbacks(workspace):
 
 
 @pytest.mark.parametrize(
-    "screen", ["Chat", "Projects", "Generated files", "Memory", "Tools", "Task history", "Settings"]
+    "screen",
+    ["Chat", "About NEXORA", "Projects", "Research", "Generated files", "Memory", "Tools", "Task history", "Settings"],
 )
 @pytest.mark.parametrize("width,height", [(1440, 900), (900, 650)])
 async def test_navigation_and_responsive_controls(workspace, screen, width, height):
@@ -138,6 +139,7 @@ async def test_public_settings_never_exposes_keys(workspace):
         "provider",
         "gemini_key_status",
         "gemini_model",
+        "creator_website",
         "voice_mode",
         "assistant_voice_enabled",
         "wake_phrase",

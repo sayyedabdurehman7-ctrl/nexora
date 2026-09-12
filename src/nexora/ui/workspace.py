@@ -10,7 +10,8 @@ from nexora.ui.client import APIClient
 from nexora.ui.components.approval_dialog import approval_dialog
 from nexora.ui.components.sidebar import sidebar
 from nexora.ui.components.task_panel import task_panel
-from nexora.ui.pages.catalog import files, tools, unavailable
+from nexora.ui.pages.about import about
+from nexora.ui.pages.catalog import files, research, tools, unavailable
 from nexora.ui.pages.chat import chat
 from nexora.ui.pages.history import history
 from nexora.ui.pages.settings import settings
@@ -23,12 +24,15 @@ class Workspace:
         self.page, self.client, self.state = page, client or APIClient(), state or UIState()
         self.state.load_preferences()
         self.root = ft.Container(expand=True)
+        self._sidebar_control = None
+        self._sidebar_signature = None
         self.goal = ft.TextField(
             hint_text="Ask NEXORA anything or give it a goal...",
             multiline=True,
             shift_enter=True,
-            min_lines=2,
+            min_lines=1,
             max_lines=4,
+            dense=True,
             border=ft.InputBorder.NONE,
             on_submit=self.submit,
             text_size=self.text_size,
@@ -164,6 +168,10 @@ class Workspace:
             )
         if screen == "Chat":
             body = chat(self)
+        elif screen == "About NEXORA":
+            body = about(self)
+        elif screen == "Research":
+            body = research(self)
         elif screen == "Task history":
             body = history(self)
         elif screen == "Settings":
@@ -205,8 +213,19 @@ class Workspace:
             ft.Column(center_controls, expand=True, spacing=12),
             expand=True,
             padding=14 if width < 900 or self.state.preferences["density"] == "Compact" else 20,
+            clip_behavior=ft.ClipBehavior.HARD_EDGE,
         )
-        columns = [sidebar(self, compact), middle]
+        sidebar_signature = (
+            compact,
+            screen,
+            self.dark,
+            self.conversation.get("id") if getattr(self, "conversation", None) else None,
+            tuple((item.get("id"), item.get("title")) for item in getattr(self, "conversations", [])),
+        )
+        if self._sidebar_control is None or self._sidebar_signature != sidebar_signature:
+            self._sidebar_control = sidebar(self, compact)
+            self._sidebar_signature = sidebar_signature
+        columns = [self._sidebar_control, middle]
         if self.state.panel_open and width >= 1250 and screen == "Chat":
             columns.append(
                 ft.Container(
@@ -217,7 +236,14 @@ class Workspace:
                     border=ft.Border.only(left=ft.BorderSide(1, colors["border"])),
                 )
             )
-        self.root.content = ft.Row(columns, expand=True, spacing=0, vertical_alignment=ft.CrossAxisAlignment.STRETCH)
+        self.root.clip_behavior = ft.ClipBehavior.HARD_EDGE
+        self.root.content = ft.Row(
+            columns,
+            key="nexora-app-shell",
+            expand=True,
+            spacing=0,
+            vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+        )
         self.page.update()
 
     async def refresh(self) -> None:

@@ -3,7 +3,36 @@
 import flet as ft
 
 from nexora.ui.state import timestamp
-from nexora.ui.theme import badge, card, coming, empty
+from nexora.ui.theme import PRIMARY, badge, card, coming, empty
+
+
+def research(app) -> ft.Control:
+    colors = app.colors
+    return ft.Container(
+        card(
+            ft.Column(
+                [
+                    ft.Icon(ft.Icons.TRAVEL_EXPLORE_OUTLINED, size=30, color=PRIMARY),
+                    ft.Text("Research", size=22, weight=ft.FontWeight.W_600),
+                    ft.Text(
+                        "Ask NEXORA to research a topic and organize the result.",
+                        color=colors["muted"],
+                    ),
+                    ft.Button(
+                        "Research a topic",
+                        icon=ft.Icons.SEARCH,
+                        on_click=app.suggestion_handler("Research "),
+                        color="white",
+                        bgcolor=PRIMARY,
+                    ),
+                ],
+                spacing=14,
+            ),
+            colors,
+        ),
+        alignment=ft.Alignment.TOP_CENTER,
+        expand=True,
+    )
 
 
 def unavailable(app, name: str) -> ft.Control:
