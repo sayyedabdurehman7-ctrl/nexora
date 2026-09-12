@@ -1,0 +1,5 @@
+NEXORA v1.0.0 Online
+
+- Online-only desktop release through the authenticated NEXORA service.
+- No local synthetic chat responses or silent fallback are used.
+- Missing or unavailable service configuration is reported clearly.

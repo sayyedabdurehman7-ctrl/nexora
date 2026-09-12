@@ -178,7 +178,7 @@ class Workspace:
                     ),
                     badge(
                         self.state.settings.get("connection_status", "NEXORA is ready"),
-                        "#268365" if self.state.settings.get("demo_mode", True) else PRIMARY,
+                        PRIMARY,
                     ),
                     ft.IconButton(ft.Icons.DARK_MODE_OUTLINED, tooltip="Toggle theme", on_click=self.toggle_theme),
                     ft.IconButton(ft.Icons.VIEW_SIDEBAR_OUTLINED, tooltip="Show plan", on_click=self.toggle_panel),

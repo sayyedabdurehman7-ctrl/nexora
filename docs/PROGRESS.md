@@ -196,3 +196,10 @@ exora.web_app:app to serve FastAPI and Flet together for a hosted service.
 - Kept the secure service boundary intact: Tester/Production use the authenticated HTTPS NEXORA service when both URL and credential are provisioned; otherwise they remain deterministic Demo mode.
 - The launcher now waits for an online service to report healthy before treating a configured deployment as ready. Health responses include only safe mode/status fields, and developer diagnostics report redacted configuration and fallback state.
 - Unsupported Demo questions now use the honest wording requested by the tester brief. No secret is bundled.
+## Online-only transition v1.0.0 — 2026-09-12
+
+- Desktop chat traffic now selects the authenticated `NexoraServiceProvider` for every build and does not return local chat replies when the service is unavailable.
+- The launcher requires `/health` to report `mode=online` before opening the desktop UI; missing URL/token or an unhealthy service stops startup and preserves local data.
+- Public settings no longer expose a Demo flag. The connection surface reports only ready, reconnecting, or temporarily offline states.
+- Built `installer/output/NEXORA-Setup-v1.0.0.exe` without the repository `.env` file or personal credentials.
+- Real online verification remains blocked until a developer provisions an HTTPS `NEXORA_SERVICE_URL` and matching `NEXORA_SERVICE_TOKEN`.

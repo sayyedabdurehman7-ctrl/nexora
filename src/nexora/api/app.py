@@ -157,7 +157,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "build_profile": config.nexora_build_profile,
             "mode": request.app.state.chat.mode,
             "connection_status": request.app.state.chat.connection_status,
-            "demo_mode": request.app.state.chat.mode == "demo",
             "creator_website": config.creator_website,
             "voice_mode": config.voice_mode,
             "assistant_voice_enabled": config.assistant_voice_enabled,
@@ -170,11 +169,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         }
         if config.nexora_build_profile == "developer":
             result.update(
-                provider=config.llm_provider,
-                gemini_key_status=(
-                    "Configured" if config.gemini_api_key.get_secret_value() else "Not Configured"
-                ),
-                gemini_model=config.gemini_model,
+                provider="nexora_service",
             )
         return result
 

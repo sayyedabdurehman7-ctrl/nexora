@@ -1,11 +1,13 @@
-NEXORA v0.3.1 TESTER INSTRUCTIONS
+NEXORA v1.0.0 ONLINE INSTRUCTIONS
 
 1. Install NEXORA.
 2. Open it from the NEXORA desktop or Start Menu shortcut. Keep only one NEXORA window open.
 3. Try chat, voice, modes, and settings.
 4. Use Feedback if something is confusing or broken.
 
-NEXORA starts in Demo mode. No API key, Python, Git, or development software is required.
+NEXORA requires a developer-provisioned secure online service. No Python, Git, or development software is required.
+
+If the service is unavailable, NEXORA shows a connection error and does not generate a local response.
 
 If NEXORA temporarily loses its connection, wait while it reconnects. If recovery fails,
 choose Try Again or Restart NEXORA Service. Use Copy Diagnostic Report to share a safe report.

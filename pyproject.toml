@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nexora"
-version = "0.3.2"
+version = "1.0.0"
 description = "An explainable, local, deterministic personal agent prototype"
 requires-python = ">=3.11"
 dependencies = [

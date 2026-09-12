@@ -1,6 +1,6 @@
 param(
     [ValidateSet('developer', 'tester', 'production')]
-    [string]$Profile = 'tester',
+    [string]$Profile = 'production',
     [switch]$PortableOnly
 )
 
@@ -10,7 +10,7 @@ Set-Location $root
 $python = Join-Path $root '.venv\Scripts\python.exe'
 $flet = Join-Path $root '.venv\Scripts\flet.exe'
 $out = Join-Path $PSScriptRoot 'output'
-$appVersion = '0.3.2'
+$appVersion = '1.0.0'
 $dist = Join-Path $out 'NEXORA'
 
 if (!(Test-Path $python) -or !(Test-Path $flet)) {
@@ -43,7 +43,7 @@ Copy-Item -LiteralPath 'README.md' -Destination (Join-Path $dist 'README.md') -F
 Copy-Item -LiteralPath 'assets' -Destination (Join-Path $dist 'assets') -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'launch-installed.ps1') -Destination (Join-Path $dist 'launch-installed.ps1') -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'TESTER_INSTRUCTIONS.txt') -Destination $dist -Force
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'CHANGELOG-v0.3.2.txt') -Destination $dist -Force
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'CHANGELOG-v1.0.0.txt') -Destination $dist -Force
 Set-Content -LiteralPath (Join-Path $dist 'build-profile.txt') -Value $Profile -Encoding ASCII
 
 if (!$PortableOnly) {

@@ -55,11 +55,7 @@ def settings(app) -> ft.Control:
                                     values.get("connection_status", "NEXORA is ready"),
                                     weight=ft.FontWeight.W_600,
                                 ),
-                                ft.Text(
-                                    "Demo mode" if values.get("demo_mode", True) else "Online mode",
-                                    size=12,
-                                    color=colors["muted"],
-                                ),
+                                ft.Text("Secure online service", size=12, color=colors["muted"]),
                             ],
                             spacing=2,
                         ),
@@ -132,7 +128,7 @@ def settings(app) -> ft.Control:
                             width=300,
                         ),
                         ft.Text(
-                            "Demo mode — no API key required" if selected == "mock" else "Online AI mode",
+                            "NEXORA online service",
                             size=13,
                             color=colors["muted"],
                             weight=ft.FontWeight.W_600,

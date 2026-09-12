@@ -1,6 +1,6 @@
 # Windows setup
 
-NEXORA supports Gemini AI for online chat and Mock AI for free offline testing. Chat
+NEXORA uses the secure NEXORA online service for chat.
 history stays in the local SQLite database. Your Gemini key stays only in the ignored
 `.env` file on this computer.
 

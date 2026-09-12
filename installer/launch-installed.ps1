@@ -1,7 +1,7 @@
 param([switch]$RecoveryTest)
 
 $ErrorActionPreference = 'Stop'
-$appVersion = '0.3.2'
+$appVersion = '1.0.0'
 $appDir = $PSScriptRoot
 $profileFile = Join-Path $appDir 'build-profile.txt'
 $buildProfile = if (Test-Path -LiteralPath $profileFile) {
@@ -120,9 +120,8 @@ function Get-BackendError {
 function Test-NexoraHealth([int]$Port) {
     try {
         $health = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 2
-        $expectedMode = if ($health.online_service_configured) { 'online' } else { 'demo' }
         return $health.status -eq 'ok' -and $health.version -eq $appVersion -and `
-            $health.build_profile -eq $buildProfile -and $health.safe_mode -and $health.mode -eq $expectedMode
+            $health.build_profile -eq $buildProfile -and $health.safe_mode -and $health.mode -eq 'online'
     } catch { return $false }
 }
 
@@ -163,11 +162,6 @@ function Start-NexoraSession {
     $env:NEXORA_APP_DIR = $appDir
     $env:NEXORA_DATA_DIR = $dataRoot
     $env:NEXORA_BUILD_PROFILE = $buildProfile
-    if ($buildProfile -eq 'tester') {
-        $env:LLM_PROVIDER = 'mock'
-        $env:GEMINI_API_KEY = ''
-        $env:GEMINI_MODEL = ''
-    }
     $databasePath = (Join-Path $dataRoot 'data\nexora.db').Replace('\', '/')
     $env:DATABASE_URL = "sqlite:///$databasePath"
     $env:NEXORA_WORKSPACE_DIR = Join-Path $dataRoot 'data\user_files'

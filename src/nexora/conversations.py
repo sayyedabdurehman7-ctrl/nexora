@@ -12,20 +12,16 @@ from nexora.db import Base, Store
 from nexora.identity import (
     IDENTITY_REWRITE_REQUEST,
     SAFE_IDENTITY_FALLBACK,
-    identity_response,
     is_identity_question,
     violates_identity,
 )
 from nexora.models import StrictModel, new_id, now
 from nexora.providers import (
-    DEMO_UNSUPPORTED,
     NO_LIVE_SOURCES,
     AnswerMode,
-    FallbackProvider,
-    GeminiProvider,
     LLMProvider,
-    MockLLMProvider,
     NexoraServiceProvider,
+    ProviderError,
 )
 
 
@@ -106,21 +102,10 @@ class ConversationService:
 
     def make_provider(self, name: str) -> LLMProvider:
         config = self.tasks.settings
-        if config.nexora_build_profile in {"tester", "production"}:
-            if config.nexora_service_configured:
-                return FallbackProvider(
-                    NexoraServiceProvider(
-                        config.nexora_service_url,
-                        config.nexora_service_token.get_secret_value(),
-                    )
-                )
-            return MockLLMProvider()
-        if name == "mock":
-            return MockLLMProvider()
-        if name == "gemini":
-            gemini = GeminiProvider(config.gemini_api_key.get_secret_value(), config.gemini_model)
-            return FallbackProvider(gemini)
-        raise Conflict("Choose Gemini AI or Mock AI in Settings.")
+        return NexoraServiceProvider(
+            config.nexora_service_url,
+            config.nexora_service_token.get_secret_value(),
+        )
 
     @property
     def mode(self) -> str:
@@ -130,7 +115,6 @@ class ConversationService:
     def connection_status(self) -> str:
         return {
             "online": "NEXORA is ready",
-            "demo": "Demo mode",
             "reconnecting": "Reconnecting…",
             "offline": "NEXORA is temporarily offline",
         }.get(self.mode, "NEXORA is temporarily offline")
@@ -183,18 +167,6 @@ class ConversationService:
         if not conversation.messages:
             conversation.title = text[:60]
         conversation.messages.append(Message(role="user", content=text, answer_mode=answer_mode))
-        local_identity = identity_response(text, self.tasks.settings.creator_website)
-        if local_identity:
-            conversation.messages.append(
-                Message(
-                    role="assistant",
-                    content=local_identity,
-                    status="completed",
-                    answer_mode=answer_mode,
-                )
-            )
-            self.store.save(conversation)
-            return conversation
         lower = text.lower()
         action = lower.startswith(
             (
@@ -242,7 +214,6 @@ class ConversationService:
                 user_text = context[-1]["content"]
                 if (
                     answer_mode == "strong"
-                    and response != DEMO_UNSUPPORTED
                     and not is_identity_question(user_text)
                     and NO_LIVE_SOURCES not in response
                 ):
@@ -257,7 +228,6 @@ class ConversationService:
                         rewritten = await self._collect_response(rewrite_context, answer_mode)
                         if (
                             answer_mode == "strong"
-                            and rewritten != DEMO_UNSUPPORTED
                             and not is_identity_question(user_text)
                             and NO_LIVE_SOURCES not in rewritten
                         ):
@@ -276,6 +246,9 @@ class ConversationService:
         except asyncio.CancelledError:
             message.status = "cancelled"
             message.content += "\n\nResponse stopped."
+        except ProviderError:
+            message.status = "failed"
+            message.content = "NEXORA is temporarily unable to connect to its online service. Please try again."
         except Exception:
             message.status = "failed"
             message.content = "Something went wrong. Try again."

@@ -1,4 +1,4 @@
-"""Gemini and deterministic Mock providers behind one chat interface."""
+"""Authenticated NEXORA online service behind the chat interface."""
 
 import asyncio
 import re
@@ -29,7 +29,7 @@ MODE_INSTRUCTIONS: dict[AnswerMode, str] = {
 }
 
 NO_LIVE_SOURCES = "Detailed analysis completed. Live web sources are not available in this mode."
-ONLINE_UNAVAILABLE = "NEXORA's intelligent replies are temporarily unavailable. Please try again when NEXORA is ready."
+ONLINE_UNAVAILABLE = "NEXORA is temporarily unable to connect to its online service. Please try again."
 DEMO_UNSUPPORTED = (
     "This question needs NEXORA’s online service. Demo mode can still demonstrate planning, calculations, "
     "local files, PDFs and the main interface."
@@ -166,22 +166,22 @@ class MockLLMProvider:
             yield answer[offset : offset + 36]
 
 
-class NexoraServiceProvider(MockLLMProvider):
+class NexoraServiceProvider:
     """Authenticated adapter for a developer-operated NEXORA service."""
 
     def __init__(self, base_url: str, token: str, client=None):
         self.base_url = base_url.rstrip("/")
         self._token = token
         self._client = client
-        self.mode = "online" if self.base_url and self._token else "demo"
+        self.mode = "online" if self.base_url and self._token else "offline"
 
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self._token}", "User-Agent": "NEXORA-Desktop"}
 
     async def health_check(self) -> dict:
         if not self.base_url or not self._token:
-            self.mode = "demo"
-            return {"status": "Not configured", "mode": "demo"}
+            self.mode = "offline"
+            return {"status": "Not configured", "mode": "offline"}
         owned = self._client is None
         client = self._client or httpx.AsyncClient(timeout=httpx.Timeout(4.0))
         try:
@@ -198,7 +198,7 @@ class NexoraServiceProvider(MockLLMProvider):
 
     async def stream_chat(self, messages: list[dict], answer_mode: AnswerMode = "medium") -> AsyncIterator[str]:
         if not self.base_url or not self._token:
-            self.mode = "demo"
+            self.mode = "offline"
             raise ProviderError("Not configured", "NEXORA online service is not configured.")
         owned = self._client is None
         client = self._client or httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=5.0))
@@ -307,12 +307,7 @@ class NexoraServiceProvider(MockLLMProvider):
         return steps
 
 
-# The service adapter reuses the same safe local task grammar as Mock mode.
-MockLLMProvider.classify_goal = NexoraServiceProvider.classify_goal
-MockLLMProvider.create_plan = NexoraServiceProvider.create_plan
-
-
-class GeminiProvider(MockLLMProvider):
+class GeminiProvider:
     """Google Gen AI SDK adapter for multi-turn streaming text chat."""
 
     def __init__(self, api_key: str, model: str, client=None):
