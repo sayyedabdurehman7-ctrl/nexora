@@ -8,6 +8,8 @@ __pycache__/
 .test-tmp-run/
 .pack-smoke/
 .packaged-test/
+.install-test/
+.install-test2/
 .ruff_cache/
 data/
 logs/

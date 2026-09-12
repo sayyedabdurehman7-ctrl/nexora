@@ -143,7 +143,9 @@ function Start-NexoraSession {
         $script:startupStage = 'opening desktop interface'
         Write-NexoraLog $script:startupStage 'Local service health check passed.'
         & $ui
-        if ($LASTEXITCODE -ne 0) { throw 'The desktop interface closed with an error.' }
+        if ($LASTEXITCODE -is [int] -and $LASTEXITCODE -ne 0) {
+            throw 'The desktop interface closed with an error.'
+        }
         Write-NexoraLog 'shutdown' 'NEXORA closed normally.'
     } finally {
         if ($null -ne $script:ownedBackend -and !$script:ownedBackend.HasExited) {
