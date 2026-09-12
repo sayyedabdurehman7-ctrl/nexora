@@ -40,7 +40,7 @@ def history(app) -> ft.Control:
                                 badge(label(task["status"])),
                                 ft.Text(timestamp(task["created_at"]), size=12),
                                 ft.Text(
-                                    f"{duration(task)} · {len(task['plan']['steps'])} steps · {task['provider']}",
+                                    f"{duration(task)} · {len(task['plan']['steps'])} steps",
                                     size=12,
                                 ),
                             ],

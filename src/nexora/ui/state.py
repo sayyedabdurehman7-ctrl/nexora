@@ -22,9 +22,30 @@ LABELS = {
     "REPLANNED": "Retry ready",
 }
 
+SIMPLE_STATUS = {
+    "RECEIVED": "NEXORA is thinking…",
+    "CLASSIFIED": "NEXORA is thinking…",
+    "PLANNED": "Creating your plan…",
+    "EXECUTING": "Working on your task…",
+    "VERIFYING": "Checking the result…",
+    "AWAITING_APPROVAL": "Waiting for your approval",
+    "COMPLETED": "Task completed",
+    "FAILED": "Something went wrong. Try again.",
+    "CANCELLED": "Task stopped",
+    "BLOCKED": "Task stopped",
+    "TIMED_OUT": "Something went wrong. Try again.",
+    "RECOVERING": "Trying that step again…",
+    "REPLANNED": "Updating your plan…",
+}
+
 
 def label(status: str) -> str:
     return LABELS.get(status, status.title())
+
+
+def simple_status(status: str) -> str:
+    """Return a short user-facing status without exposing engine terminology."""
+    return SIMPLE_STATUS.get(status, "NEXORA is working…")
 
 
 def timestamp(value: str | None) -> str:
@@ -75,16 +96,23 @@ class UIState:
     connected: bool = False
     busy: bool = False
     collapsed: bool = False
-    panel_open: bool = True
+    panel_open: bool = False
+    plan_expanded: bool = False
     panel_tab: str = "Plan"
     search: str = ""
     status_filter: str = "All"
     date_filter: str = ""
     preferences: dict = field(
         default_factory=lambda: {
-            "theme": "system",
+            "theme": "light",
             "density": "Comfortable",
             "text_size": 14,
+            "provider": "",
+            "gemini_model": "",
+            "answer_mode": "medium",
+            "voice_mode": "push_to_talk",
+            "assistant_voice_enabled": False,
+            "wake_phrase": "Hey NEXORA",
             "welcomed": False,
         }
     )
@@ -96,6 +124,8 @@ class UIState:
             for key in self.preferences:
                 if key in values:
                     self.preferences[key] = values[key]
+            if self.preferences["provider"] not in ("", "gemini", "mock"):
+                self.preferences["provider"] = "gemini"
         except (OSError, ValueError, TypeError):
             pass
 

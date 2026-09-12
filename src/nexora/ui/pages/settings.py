@@ -1,149 +1,161 @@
 import flet as ft
 
-from nexora.ui.theme import badge, card, coming
+from nexora.ui.theme import PRIMARY, card
 
 
 def settings(app) -> ft.Control:
     values, colors = app.state.settings, app.colors
-    controls = [
-        ft.Text("Settings", size=28, weight=ft.FontWeight.W_600),
-        ft.Text("A local workspace, with clear boundaries.", color=colors["muted"]),
+    provider_controls = hasattr(app, "provider_changed")
+    selected = getattr(app, "pending_provider", None) or values.get("provider", "gemini")
+    model = (
+        app.pending_gemini_model
+        if getattr(app, "pending_gemini_model", None) is not None
+        else values.get("gemini_model", "")
+    )
+    provider_options = [
+        ft.DropdownOption("gemini", "Gemini AI"),
+        ft.DropdownOption("mock", "Mock AI"),
     ]
-    controls.append(
-        card(
-            ft.Column(
-                [
-                    ft.Text("AI provider", size=19, weight=ft.FontWeight.W_600),
-                    badge("Mock · selected · no API key"),
-                    ft.Text("Model: deterministic commands. General questions are not supported yet."),
-                    ft.Row(
-                        [
-                            ft.Button("Test connection", icon=ft.Icons.WIFI, on_click=app.reconnect),
-                            coming("OpenAI"),
-                            coming("Ollama"),
-                        ],
-                        wrap=True,
-                    ),
-                    ft.Text(
-                        "Put credentials in local .env. Secret values are never shown.",
-                        size=12,
-                    ),
-                ]
-            ),
-            colors,
-        )
+    voice_mode = getattr(app, "pending_voice_mode", None) or values.get("voice_mode", "push_to_talk")
+    assistant_voice = (
+        app.pending_assistant_voice
+        if getattr(app, "pending_assistant_voice", None) is not None
+        else values.get("assistant_voice_enabled", False)
     )
-    controls.append(
-        card(
-            ft.Column(
-                [
-                    ft.Text("Safety", size=19, weight=ft.FontWeight.W_600),
-                    badge("Safe Mode on", "#268365"),
-                    ft.Text(
-                        f"Maximum steps: {values.get('max_plan_steps', 'Unavailable')}\n"
-                        f"Maximum retries: {values.get('max_tool_retries', 'Unavailable')}\n"
-                        f"Task duration: {values.get('max_task_seconds', 'Unavailable')} seconds"
-                    ),
-                    ft.Text("Approved workspace", weight=ft.FontWeight.W_600),
-                    ft.Text(
-                        values.get("workspace", "Connect to the backend to see the workspace."),
-                        selectable=True,
-                    ),
-                    ft.Text("Allowed tools: Calculator, Files\nAllowed websites: none."),
-                    coming("Edit safety settings"),
-                    ft.Text(
-                        "Edit .env and restart to change supported limits.",
-                        size=12,
-                    ),
-                ]
+    wake_phrase = getattr(app, "pending_wake_phrase", None) or values.get("wake_phrase", "Hey NEXORA")
+    content = ft.Column(
+        [
+            ft.Text("AI Settings", size=28, weight=ft.FontWeight.W_600),
+            ft.Text("Choose the AI used for new replies.", color=colors["muted"]),
+            card(
+                ft.Column(
+                    [
+                        ft.Dropdown(
+                            label="AI Provider",
+                            value=selected,
+                            options=provider_options,
+                            on_select=getattr(app, "provider_changed", None),
+                            disabled=not provider_controls,
+                            width=300,
+                        ),
+                        ft.Text(
+                            "Gemini API: Connected"
+                            if values.get("gemini_key_status") == "Configured"
+                            else "Gemini API key: Not configured",
+                            weight=ft.FontWeight.W_600,
+                        ),
+                        ft.TextField(
+                            label="Gemini Model",
+                            value=model,
+                            hint_text="Enter the model ID from Google AI Studio",
+                            on_change=getattr(app, "gemini_model_changed", None),
+                            disabled=not provider_controls,
+                            width=420,
+                        ),
+                        ft.Row(
+                            [
+                                ft.Button(
+                                    "Test Gemini Connection",
+                                    icon=ft.Icons.WIFI,
+                                    on_click=getattr(app, "test_gemini", None),
+                                    disabled=not provider_controls,
+                                ),
+                                ft.Button(
+                                    "Save Settings",
+                                    icon=ft.Icons.SAVE_OUTLINED,
+                                    on_click=getattr(app, "save_provider_settings", None),
+                                    disabled=not provider_controls,
+                                    color="white",
+                                    bgcolor=PRIMARY,
+                                ),
+                            ],
+                            wrap=True,
+                        ),
+                        ft.Text(
+                            getattr(app, "gemini_status", ""),
+                            size=13,
+                            color=colors["muted"],
+                        ),
+                    ],
+                    spacing=18,
+                ),
+                colors,
             ),
-            colors,
-        )
-    )
-    controls.append(
-        card(
-            ft.Column(
-                [
-                    ft.Text("Memory & privacy", size=19, weight=ft.FontWeight.W_600),
-                    ft.Text(
-                        "Long-term memory: not implemented\nAudio and screenshots: not captured\n"
-                        "Task history and audit events: kept locally until you manage the database"
-                    ),
-                    ft.Row(
-                        [
-                            coming("Enable memory"),
-                            coming("Clear memory"),
-                            coming("Export memory"),
-                            coming("Log retention"),
-                        ],
-                        wrap=True,
-                    ),
-                ]
+            ft.Text("Voice Settings", size=24, weight=ft.FontWeight.W_600),
+            card(
+                ft.Column(
+                    [
+                        ft.Dropdown(
+                            label="Voice mode",
+                            value=voice_mode,
+                            options=[
+                                ft.DropdownOption("off", "Off"),
+                                ft.DropdownOption("push_to_talk", "Push-to-Talk"),
+                                ft.DropdownOption("wake_word", "Wake Word — Experimental - setup required"),
+                            ],
+                            on_select=getattr(app, "voice_mode_changed", None),
+                            width=430,
+                        ),
+                        ft.Text(
+                            "Microphone permission: "
+                            + getattr(app, "voice", {}).get("microphone_permission", "Not tested"),
+                            weight=ft.FontWeight.W_600,
+                        ),
+                        ft.Switch(
+                            label="Assistant voice",
+                            value=assistant_voice,
+                            on_change=getattr(app, "assistant_voice_changed", None),
+                        ),
+                        ft.TextField(
+                            label="Wake phrase",
+                            value=wake_phrase,
+                            hint_text="Hey NEXORA",
+                            on_change=getattr(app, "wake_phrase_changed", None),
+                            width=420,
+                        ),
+                        ft.Text(
+                            "Wake Word is off by default. Enabling it would keep the microphone available, so "
+                            "NEXORA shows a privacy warning first. Local wake detection is not installed yet.",
+                            size=12,
+                            color=colors["muted"],
+                        ),
+                        ft.Row(
+                            [
+                                ft.Button(
+                                    "Test microphone",
+                                    icon=ft.Icons.MIC_NONE,
+                                    on_click=getattr(app, "test_microphone", None),
+                                ),
+                                ft.Button(
+                                    "Test NEXORA voice",
+                                    icon=ft.Icons.VOLUME_UP_OUTLINED,
+                                    on_click=getattr(app, "test_voice", None),
+                                ),
+                                ft.Button(
+                                    "Stop Listening",
+                                    icon=ft.Icons.MIC_OFF_OUTLINED,
+                                    on_click=lambda event: app.page.run_task(app.voice_action, "cancel"),
+                                    visible=bool(
+                                        getattr(app, "voice", {}).get("microphone_active")
+                                        and voice_mode == "wake_word"
+                                    ),
+                                ),
+                            ],
+                            wrap=True,
+                        ),
+                        ft.Button(
+                            "Save voice settings",
+                            icon=ft.Icons.SAVE_OUTLINED,
+                            on_click=getattr(app, "save_voice_settings", None),
+                            color="white",
+                            bgcolor=PRIMARY,
+                        ),
+                    ],
+                    spacing=16,
+                ),
+                colors,
             ),
-            colors,
-        )
+        ],
+        spacing=18,
     )
-    controls.append(
-        card(
-            ft.Column(
-                [
-                    ft.Text("Appearance", size=19, weight=ft.FontWeight.W_600),
-                    ft.Row(
-                        [
-                            ft.Dropdown(
-                                label="Theme",
-                                width=180,
-                                value=app.state.preferences["theme"],
-                                options=[ft.DropdownOption(v) for v in ("light", "dark", "system")],
-                                on_select=app.theme_changed,
-                            ),
-                            ft.Dropdown(
-                                label="Density",
-                                width=180,
-                                value=app.state.preferences["density"],
-                                options=[ft.DropdownOption(v) for v in ("Comfortable", "Compact")],
-                                on_select=app.density_changed,
-                            ),
-                            ft.Dropdown(
-                                label="Text size",
-                                width=150,
-                                value=str(app.text_size),
-                                options=[ft.DropdownOption(str(v)) for v in (14, 16, 18)],
-                                on_select=app.text_changed,
-                            ),
-                        ],
-                        wrap=True,
-                    ),
-                ]
-            ),
-            colors,
-        )
-    )
-    controls.append(
-        card(
-            ft.Column(
-                [
-                    ft.Text("About NEXORA", size=19, weight=ft.FontWeight.W_600),
-                    ft.Text("Version 0.1.0 · Computer Science Final Year Project"),
-                    ft.Text(
-                        "An Autonomous Multimodal Personal AI Agent for Goal-Based Task Planning, "
-                        "Tool Selection, and Cross-Application Execution"
-                    ),
-                    ft.Text("Connected" if app.state.connected else "Backend offline"),
-                    ft.Row(
-                        [
-                            ft.TextButton("Quick guide", on_click=app.help_dialog),
-                            ft.TextButton("First-run guide", on_click=app.welcome_dialog),
-                        ],
-                        wrap=True,
-                    ),
-                    ft.Text(
-                        "Full documentation: README.md and docs/SETUP.md in your NEXORA folder.",
-                        size=12,
-                    ),
-                ]
-            ),
-            colors,
-        )
-    )
-    return ft.ListView(controls, expand=True, spacing=18)
+    return ft.ListView([content], expand=True, spacing=18)

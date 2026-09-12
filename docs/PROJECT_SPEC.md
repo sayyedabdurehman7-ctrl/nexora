@@ -7,6 +7,14 @@ approval, and user-controlled memory. Explain changes in simple English.
 
 ## Current acceptance: Phases 0 and 1
 
+User-authorized current extension: saved multi-turn conversations, Gemini as the main online
+provider, Mock fallback, and push-to-talk with faster-whisper and pyttsx3.
+This explicit scope supersedes the older phase order for voice only; no browser, image,
+video, screen capture or unrestricted desktop tools. Mock remains default. Keep existing
+task APIs and safe tools. Destructive filesystem tools remain unavailable and fail closed.
+Audio must stay transient, with explicit recording start, stop, cancellation and mute.
+Speech is AI-generated. Gemini keys stay in ignored local `.env`; paid OpenAI is unavailable.
+
 - Python 3.11+, Flet UI, FastAPI API, Pydantic settings/models, SQLAlchemy SQLite.
 - No API key or runtime internet required; deterministic mock plans.
 - Health, create/read/list/run/cancel tasks, audit polling, tools, approve/reject endpoints.

@@ -1,12 +1,114 @@
 import flet as ft
 
-from nexora.ui.state import duration, label, timestamp
+from nexora.ui.state import TERMINAL, duration, label, simple_status, timestamp
 from nexora.ui.theme import PRIMARY, badge, card
 
 RISK_COLORS = {"low": "#268365", "medium": "#B87516", "high": "#D94B59", "critical": "#922937"}
 
 
+def _clean_step(description: str) -> str:
+    return description.replace(" (mock plan)", "")
+
+
+def _simple_task_panel(app) -> ft.Control:
+    state, colors, task = app.state, app.colors, app.state.task
+    header = ft.Row(
+        [
+            ft.Text("Plan and activity", size=17, weight=ft.FontWeight.W_600, expand=True),
+            ft.IconButton(ft.Icons.CLOSE, tooltip="Close", on_click=app.close_panel),
+        ]
+    )
+    if not task:
+        return ft.Column(
+            [
+                header,
+                ft.Divider(color=colors["border"]),
+                ft.Icon(ft.Icons.FORMAT_LIST_NUMBERED, size=30, color=PRIMARY),
+                ft.Text("No active task", size=16, weight=ft.FontWeight.W_600),
+                ft.Text("A plan will appear here when your request needs actions.", color=colors["muted"]),
+            ],
+            spacing=14,
+        )
+    steps = task["plan"]["steps"]
+    completed = sum(step["status"] == "COMPLETED" for step in steps)
+    current = next(
+        (step for step in steps if step["status"] not in ("COMPLETED", "FAILED", "CANCELLED")),
+        steps[-1] if steps else None,
+    )
+    progress = completed / len(steps) if steps else (1 if task["status"] == "COMPLETED" else 0)
+    controls = [
+        header,
+        ft.Divider(color=colors["border"]),
+        ft.Text("Current task", size=12, color=colors["muted"], weight=ft.FontWeight.W_600),
+        ft.Text(task["user_text"], size=15, weight=ft.FontWeight.W_600),
+        ft.Text(simple_status(task["status"]), color=PRIMARY, weight=ft.FontWeight.W_600),
+        ft.ProgressBar(value=progress, color=PRIMARY, bgcolor=colors["border"]),
+        ft.Text(
+            f"{completed} of {len(steps)} steps complete" if steps else "Preparing the first step…",
+            size=12,
+            color=colors["muted"],
+        ),
+    ]
+    if current:
+        controls += [
+            ft.Text("Current step", size=12, color=colors["muted"], weight=ft.FontWeight.W_600),
+            ft.Text(_clean_step(current["description"]), size=14),
+        ]
+    if state.plan_expanded and steps:
+        controls += [ft.Divider(color=colors["border"]), ft.Text("Full plan", weight=ft.FontWeight.W_600)]
+        for step in steps:
+            step_label = {
+                "COMPLETED": "Done",
+                "FAILED": "Failed",
+                "CANCELLED": "Stopped",
+                "EXECUTING": "In progress",
+                "VERIFYING": "Checking",
+            }.get(step["status"], "Next")
+            controls.append(
+                ft.Row(
+                    [
+                        ft.Container(
+                            ft.Text(str(step["order"]), color="white", size=12, text_align=ft.TextAlign.CENTER),
+                            bgcolor=PRIMARY if step["status"] == "COMPLETED" else colors["muted"],
+                            width=25,
+                            height=25,
+                            border_radius=13,
+                            alignment=ft.Alignment.CENTER,
+                        ),
+                        ft.Column(
+                            [
+                                ft.Text(_clean_step(step["description"]), size=13),
+                                ft.Text(step_label, size=12, color=colors["muted"]),
+                            ],
+                            spacing=1,
+                            expand=True,
+                        ),
+                    ]
+                )
+            )
+    actions = [
+        ft.TextButton(
+            "Hide Plan" if state.plan_expanded else "View Plan",
+            icon=ft.Icons.FORMAT_LIST_NUMBERED,
+            on_click=app.toggle_plan_steps,
+        ),
+        ft.TextButton("View Details", icon=ft.Icons.INFO_OUTLINE, on_click=app.show_task_details),
+    ]
+    if task["status"] not in TERMINAL:
+        actions.insert(0, ft.Button("Stop", icon=ft.Icons.STOP_CIRCLE_OUTLINED, on_click=app.stop))
+    controls.append(ft.Row(actions, wrap=True))
+    return ft.Column(
+        [
+            *controls[:1],
+            ft.Column(controls[1:], spacing=14, scroll=ft.ScrollMode.AUTO, expand=True),
+        ],
+        expand=True,
+    )
+
+
 def task_panel(app) -> ft.Control:
+    if hasattr(app, "conversation"):
+        return _simple_task_panel(app)
     state, colors = app.state, app.colors
     task = state.task
     tabs = ft.Row(
@@ -35,6 +137,16 @@ def task_panel(app) -> ft.Control:
                 color=colors["muted"],
             ),
         ]
+        conversation = getattr(app, "conversation", None)
+        if conversation and len(conversation["messages"]) >= 2:
+            latest = conversation["messages"][-1]
+            request = conversation["messages"][-2]["content"].lower()
+            if "plan" in request and latest["role"] == "assistant":
+                content = [
+                    ft.Text("Suggested plan", weight=ft.FontWeight.BOLD),
+                    ft.Text("Advice only. No tools are executing.", size=12),
+                    ft.Text(latest["content"] or "Preparing your plan…", selectable=True),
+                ]
     elif state.panel_tab == "Plan":
         content = [
             ft.Text(task["user_text"], weight=ft.FontWeight.W_600),
@@ -70,7 +182,7 @@ def task_panel(app) -> ft.Control:
                 )
             )
         if not task["plan"]["steps"]:
-            content.append(ft.Text("No executable plan. Try a supported mock command."))
+            content.append(ft.Text("No executable plan. Try a supported command."))
     elif state.panel_tab == "Activity":
         content = [ft.Text("Live activity", size=17, weight=ft.FontWeight.W_600)]
         content += [
@@ -119,8 +231,6 @@ def task_panel(app) -> ft.Control:
             "Duration": duration(task),
             "Steps": len(task["plan"]["steps"]),
             "Human approvals": task["interventions"],
-            "Provider": task["provider"],
-            "API usage": "None · deterministic mock",
         }.items():
             content += [
                 ft.Text(key, size=11, color=colors["muted"]),

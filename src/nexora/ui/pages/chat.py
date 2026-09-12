@@ -2,69 +2,204 @@ import flet as ft
 
 from nexora.ui.components.chat_composer import composer
 from nexora.ui.components.chat_message import messages
-from nexora.ui.theme import PRIMARY, card
+from nexora.ui.state import TERMINAL, response_text, simple_status
+from nexora.ui.theme import PRIMARY
+
+
+def _message_text(app, message: dict) -> tuple[str, str]:
+    status = message["status"]
+    if message.get("task_id"):
+        task = app.state.task
+        if task and task["id"] == message["task_id"]:
+            text = response_text(task) if task["status"] == "COMPLETED" else ""
+            return text, simple_status(task["status"])
+    if status == "responding":
+        return message["content"], "NEXORA is thinking..."
+    if status == "failed":
+        return "", "Something went wrong. Try again."
+    if status == "cancelled":
+        return message["content"].replace("Response stopped.", "").strip(), "Task stopped"
+    return message["content"], ""
+
+
+def _conversation_message(app, message: dict) -> ft.Control:
+    colors = app.colors
+    if message["role"] == "user":
+        return ft.Container(
+            ft.Container(
+                ft.Column(
+                    [
+                        ft.Text("You", size=13, weight=ft.FontWeight.W_600),
+                        ft.Text(message["content"], selectable=True, size=app.text_size),
+                        ft.Text(
+                            {
+                                "light": "Low",
+                                "medium": "Medium",
+                                "strong": "Strong / Deep Reply",
+                            }.get(message.get("answer_mode"), "Medium"),
+                            size=11,
+                            color=colors["muted"],
+                        ),
+                    ],
+                    spacing=8,
+                ),
+                padding=ft.Padding.symmetric(horizontal=16, vertical=12),
+                bgcolor=colors["accent"],
+                border_radius=16,
+                width=min(700, (app.page.width or 1000) * 0.68),
+            ),
+            alignment=ft.Alignment.CENTER_RIGHT,
+        )
+
+    text, status_text = _message_text(app, message)
+    task = app.state.task if message.get("task_id") else None
+    active = bool(task and task["status"] not in TERMINAL) or message["status"] == "responding"
+    action_controls: list[ft.Control] = []
+    if text and (message["status"] == "completed" or task):
+        action_controls.append(
+            ft.TextButton("Copy Answer", icon=ft.Icons.COPY_OUTLINED, on_click=app.copy_handler(text))
+        )
+    if task:
+        approval = task.get("approval")
+        if task["status"] == "AWAITING_APPROVAL" and approval and approval.get("status") == "pending":
+            action_controls += [
+                ft.Button("Approve", icon=ft.Icons.CHECK, on_click=app.decision_handler(True)),
+                ft.TextButton("Reject", icon=ft.Icons.CLOSE, on_click=app.decision_handler(False)),
+            ]
+    if message["status"] in ("failed", "cancelled") or (task and task["status"] in ("FAILED", "TIMED_OUT")):
+        previous = next(
+            (item["content"] for item in reversed(app.conversation["messages"]) if item["role"] == "user"),
+            "",
+        )
+        action_controls.append(
+            ft.Button("Retry", icon=ft.Icons.REFRESH, on_click=app.retry_handler({"user_text": previous}))
+        )
+    if message["status"] == "failed" or (task and task["status"] in ("FAILED", "TIMED_OUT")):
+        action_controls.append(ft.TextButton("View Details", on_click=app.show_error_details))
+    if message["status"] == "completed":
+        action_controls.append(
+            ft.PopupMenuButton(
+                content=ft.Container(
+                    ft.Row([ft.Text("More"), ft.Icon(ft.Icons.ARROW_DROP_DOWN, size=16)], spacing=2),
+                    padding=6,
+                ),
+                tooltip="More",
+                items=[
+                    ft.PopupMenuItem(
+                        content=ft.Text("Play voice"),
+                        icon=ft.Icons.VOLUME_UP_OUTLINED,
+                        on_click=app.speak_handler(message["id"]),
+                    )
+                ],
+            )
+        )
+
+    body: list[ft.Control] = [
+        ft.Row(
+            [
+                ft.Container(
+                    ft.Text("N", color="white", size=12, weight=ft.FontWeight.BOLD),
+                    bgcolor=PRIMARY,
+                    width=28,
+                    height=28,
+                    border_radius=14,
+                    alignment=ft.Alignment.CENTER,
+                ),
+                ft.Text("NEXORA", size=13, weight=ft.FontWeight.W_600),
+            ]
+        )
+    ]
+    if status_text:
+        body.append(
+            ft.Row(
+                [
+                    ft.ProgressRing(width=15, height=15, stroke_width=2, visible=active),
+                    ft.Icon(
+                        ft.Icons.CHECK_CIRCLE_OUTLINE,
+                        size=17,
+                        color="#268365",
+                        visible=status_text == "Task completed",
+                    ),
+                    ft.Text(
+                        status_text,
+                        size=14,
+                        color="#B4404A" if "wrong" in status_text or status_text == "Task stopped" else PRIMARY,
+                        weight=ft.FontWeight.W_600,
+                    ),
+                ],
+                spacing=8,
+            )
+        )
+    if text:
+        body.append(
+            ft.Markdown(
+                text,
+                selectable=True,
+                extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
+                on_tap_link=app.source_link,
+            )
+        )
+    if action_controls:
+        body.append(ft.Row(action_controls, wrap=True, spacing=6))
+    return ft.Container(ft.Column(body, spacing=12), padding=ft.Padding.symmetric(horizontal=8, vertical=10))
 
 
 def chat(app) -> ft.Control:
     colors = app.colors
-    if app.state.task:
+    empty_conversation = False
+    if getattr(app, "conversation", None):
+        body = [_conversation_message(app, message) for message in app.conversation["messages"]]
+    elif app.state.task:
         body = messages(app, app.state.task)
-    else:
-        suggestions = [
-            ("Research a topic", ft.Icons.TRAVEL_EXPLORE, None),
-            ("Summarize a PDF", ft.Icons.DESCRIPTION_OUTLINED, None),
-            ("Find a file", ft.Icons.FOLDER_OPEN, "list files"),
-            ("Create a project plan", ft.Icons.ROUTE_OUTLINED, None),
-            ("Continue my FYP", ft.Icons.SCHOOL_OUTLINED, None),
-            ("View my saved memory", ft.Icons.BOOKMARK_BORDER, None),
-        ]
-        cards = []
-        for title, icon, command in suggestions:
-            cards.append(
-                card(
-                    ft.Column(
-                        [
-                            ft.Icon(icon, color=PRIMARY, size=22),
-                            ft.Text(title, weight=ft.FontWeight.W_600, size=13),
-                            ft.Text(
-                                "Run: list files" if command else "Coming Soon",
-                                size=11,
-                                color=colors["muted"],
-                            ),
-                            ft.TextButton(
-                                "Try it" if command else "Coming Soon",
-                                disabled=not bool(command),
-                                on_click=app.suggestion_handler(command) if command else None,
-                            ),
-                        ],
-                        spacing=6,
-                    ),
-                    colors,
-                    col={"xs": 12, "sm": 6, "lg": 4},
-                )
-            )
+    elif hasattr(app, "conversation"):
+        empty_conversation = True
         body = [
-            ft.Container(height=20),
-            ft.Icon(ft.Icons.AUTO_AWESOME, size=36, color=PRIMARY),
-            ft.Text("How can I help you today?", size=30, weight=ft.FontWeight.W_600),
-            ft.Text("Give me a goal. I will plan, execute and verify it.", color=colors["muted"]),
-            ft.Text(
-                "Start with a supported mock command. General chat arrives with AI providers.",
-                size=12,
-                color=colors["muted"],
-            ),
-            ft.ResponsiveRow(cards, spacing=12, run_spacing=12),
-            ft.Row(
-                [
-                    ft.TextButton("Try a calculation", on_click=app.suggestion_handler("calculate 2 + 3 * 4")),
-                    ft.TextButton("Explore approval", on_click=app.suggestion_handler("approval demo")),
-                ],
-                wrap=True,
-            ),
+            ft.Container(
+                ft.Column(
+                    [
+                        ft.Container(
+                            ft.Text("N", color="white", size=24, weight=ft.FontWeight.BOLD),
+                            bgcolor=PRIMARY,
+                            width=54,
+                            height=54,
+                            border_radius=18,
+                            alignment=ft.Alignment.CENTER,
+                        ),
+                        ft.Text("How can I help you today?", size=28, weight=ft.FontWeight.W_600),
+                        ft.Text(
+                            "Ask a question, talk through a problem, or give NEXORA a task.",
+                            size=15,
+                            color=colors["muted"],
+                            text_align=ft.TextAlign.CENTER,
+                        ),
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    spacing=16,
+                ),
+                alignment=ft.Alignment.CENTER,
+            )
         ]
+    else:
+        body = messages(app, app.state.task) if app.state.task else [
+            ft.Container(height=40),
+            ft.Text("How can I help you today?", size=28, weight=ft.FontWeight.W_600),
+        ]
+    conversation_area = (
+        ft.Container(body[0], expand=True, alignment=ft.Alignment.CENTER)
+        if empty_conversation
+        else ft.ListView(
+            body,
+            expand=True,
+            key="chat-messages",
+            auto_scroll=getattr(app, "chat_at_bottom", True),
+            on_scroll=getattr(app, "chat_scroll", None),
+            spacing=14,
+            padding=ft.Padding.only(left=8, right=8, bottom=20),
+        )
+    )
     return ft.Column(
         [
-            ft.ListView(body, expand=True, spacing=18, padding=ft.Padding.only(bottom=20)),
+            conversation_area,
             composer(app),
         ],
         expand=True,

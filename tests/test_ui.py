@@ -8,7 +8,7 @@ import pytest
 
 from nexora.api.app import create_app
 from nexora.ui.client import APIClient
-from nexora.ui.state import UIState, response_text
+from nexora.ui.state import UIState, response_text, simple_status
 from nexora.ui.workspace import Workspace
 
 
@@ -136,6 +136,11 @@ async def test_public_settings_never_exposes_keys(workspace):
     ui, _ = workspace
     assert set(ui.state.settings) == {
         "provider",
+        "gemini_key_status",
+        "gemini_model",
+        "voice_mode",
+        "assistant_voice_enabled",
+        "wake_phrase",
         "safe_mode",
         "max_plan_steps",
         "max_tool_retries",
@@ -152,3 +157,13 @@ def test_preferences_persist(tmp_path):
     another = UIState(preference_path=path)
     another.load_preferences()
     assert another.preferences["theme"] == "dark"
+
+
+def test_simple_first_run_defaults_and_status_text():
+    state = UIState(preference_path=None)
+    assert state.preferences["theme"] == "light"
+    assert state.panel_open is False
+    assert simple_status("AWAITING_APPROVAL") == "Waiting for your approval"
+    assert simple_status("COMPLETED") == "Task completed"
+    assert simple_status("CANCELLED") == "Task stopped"
+    assert simple_status("FAILED") == "Something went wrong. Try again."

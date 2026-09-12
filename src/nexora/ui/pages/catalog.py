@@ -113,7 +113,7 @@ def tools(app) -> ft.Control:
     controls = [
         ft.Text("Tools", size=28, weight=ft.FontWeight.W_600),
         ft.Text(
-            "The mock planner selects tools from your command. Only registered tools can run.",
+            "The NEXORA planner selects tools from your command. Only registered tools can run.",
             color=app.colors["muted"],
         ),
     ]
@@ -135,7 +135,7 @@ def tools(app) -> ft.Control:
                         ),
                         ft.Text(purpose),
                         ft.Text(
-                            "Local · Low risk" if enabled else "Provider and risk available after integration",
+                            "Local · Low risk" if enabled else "Availability and risk shown after integration",
                             size=12,
                         ),
                         ft.Row(

@@ -9,6 +9,8 @@ from nexora.db import Store
 def settings(tmp_path):
     return Settings(
         _env_file=None,
+        llm_provider="mock",
+        gemini_api_key="",
         database_url=f"sqlite:///{tmp_path / 'test.db'}",
         nexora_workspace_dir=tmp_path / "files",
     )

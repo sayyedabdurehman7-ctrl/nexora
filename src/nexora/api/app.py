@@ -1,6 +1,8 @@
 """Local-only FastAPI adapter. Business logic lives in Service."""
 
 from contextlib import asynccontextmanager
+import os
+from typing import Literal
 from uuid import uuid4
 
 import uvicorn
@@ -10,25 +12,33 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from nexora.config import Settings
+from nexora.config import Settings, gemini_key_diagnostic, load_settings
+from nexora.conversations import ConversationService
 from nexora.core import Conflict, Service
 from nexora.db import Store
 from nexora.models import GoalInput
+from nexora.providers import GeminiProvider
+from nexora.voice import VoiceService
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        config = settings or Settings()
+        config = settings or load_settings()
         service = Service(config, Store(config.database_url))
         service.recover_interrupted()
         app.state.service = service
+        app.state.chat = ConversationService(service)
+        app.state.voice = VoiceService(config)
         yield
+        await app.state.voice.cancel()
+        await app.state.chat.close()
         await service.close()
         service.store.engine.dispose()
 
-    app = FastAPI(title="NEXORA (mock, Phase 1)", lifespan=lifespan)
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"])
+    app = FastAPI(title="NEXORA", lifespan=lifespan)
+    hosts = [h.strip() for h in os.getenv("NEXORA_ALLOWED_HOSTS", "127.0.0.1,localhost,testserver").split(",") if h.strip()]
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts)
 
     @app.middleware("http")
     async def correlation(request: Request, call_next):
@@ -79,8 +89,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return error(request, 500, "INTERNAL_ERROR", "An internal error occurred.")
 
     @app.get("/health")
-    async def health():
-        return {"status": "ok", "provider": "mock", "safe_mode": True}
+    async def health(request: Request):
+        return {"status": "ok", "provider": request.app.state.service.settings.llm_provider, "safe_mode": True}
 
     @app.get("/api/v1/settings")
     async def public_settings(request: Request):
@@ -88,12 +98,45 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # Explicit allowlist: never serialize the settings object or secret fields.
         return {
             "provider": config.llm_provider,
+            "gemini_key_status": "Configured" if config.gemini_api_key.get_secret_value() else "Not Configured",
+            "gemini_model": config.gemini_model,
+            "voice_mode": config.voice_mode,
+            "assistant_voice_enabled": config.assistant_voice_enabled,
+            "wake_phrase": config.wake_phrase,
             "safe_mode": config.nexora_safe_mode,
             "max_plan_steps": config.max_plan_steps,
             "max_tool_retries": config.max_tool_retries,
             "max_task_seconds": config.max_task_seconds,
             "workspace": str(config.nexora_workspace_dir.resolve()),
         }
+
+    @app.get("/api/v1/settings/gemini/diagnostic")
+    async def gemini_diagnostic(request: Request):
+        config = request.app.state.service.settings
+        return {"message": gemini_key_diagnostic(config)}
+
+    class ProviderInput(BaseModel):
+        provider: Literal["gemini", "mock"]
+        gemini_model: str | None = Field(default=None, max_length=100)
+
+    @app.patch("/api/v1/settings/provider")
+    async def select_provider(body: ProviderInput, request: Request):
+        selected = request.app.state.chat.select_provider(body.provider, body.gemini_model)
+        config = request.app.state.service.settings
+        return {
+            "provider": selected,
+            "gemini_model": config.gemini_model,
+            "gemini_key_status": "Configured" if config.gemini_api_key.get_secret_value() else "Not Configured",
+        }
+
+    class GeminiTestInput(BaseModel):
+        model: str = Field(default="", max_length=100)
+
+    @app.post("/api/v1/settings/gemini/test")
+    async def test_gemini(body: GeminiTestInput, request: Request):
+        config = request.app.state.service.settings
+        provider = GeminiProvider(config.gemini_api_key.get_secret_value(), body.model.strip() or config.gemini_model)
+        return await provider.test_connection()
 
     @app.post("/api/v1/tasks", status_code=201)
     async def create_goal(body: GoalInput, request: Request):
@@ -158,11 +201,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def memory_delete(memory_id: str, request: Request):
         request.app.state.service.store.memory_delete(memory_id)
 
+    from nexora.api.conversation_routes import router
+
+    app.include_router(router)
     return app
 
 
 def main() -> None:
-    uvicorn.run("nexora.api.app:create_app", factory=True, host="127.0.0.1", port=8000, access_log=False)
+    uvicorn.run("nexora.api.app:create_app", factory=True, host=os.getenv("HOST", "127.0.0.1"), port=int(os.getenv("PORT", "8000")), access_log=False)
 
 
 if __name__ == "__main__":

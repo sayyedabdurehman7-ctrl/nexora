@@ -1,7 +1,7 @@
 import flet as ft
 
-from nexora.ui.state import TERMINAL, label, response_text, timestamp
-from nexora.ui.theme import PRIMARY, badge
+from nexora.ui.state import TERMINAL, response_text, simple_status
+from nexora.ui.theme import PRIMARY
 
 
 def messages(app, task: dict) -> list[ft.Control]:
@@ -12,7 +12,6 @@ def messages(app, task: dict) -> list[ft.Control]:
             [
                 ft.Text("YOU", size=10, color=PRIMARY, weight=ft.FontWeight.BOLD),
                 ft.Text(task["user_text"], selectable=True, size=app.text_size),
-                ft.Text(timestamp(task["created_at"]), size=10, color=colors["muted"]),
             ]
         ),
         padding=18,
@@ -20,17 +19,15 @@ def messages(app, task: dict) -> list[ft.Control]:
         bgcolor=colors["accent"],
     )
     actions = [
-        ft.IconButton(ft.Icons.COPY_OUTLINED, tooltip="Copy response", on_click=app.copy_handler(text)),
-        ft.IconButton(ft.Icons.THUMB_UP_OUTLINED, disabled=True, tooltip="Save feedback · Coming Soon"),
-        ft.IconButton(ft.Icons.THUMB_DOWN_OUTLINED, disabled=True, tooltip="Save feedback · Coming Soon"),
+        ft.TextButton("Copy Answer", icon=ft.Icons.COPY_OUTLINED, on_click=app.copy_handler(text)),
+        ft.TextButton("View Plan", icon=ft.Icons.FORMAT_LIST_NUMBERED, on_click=app.open_plan),
     ]
     if task["status"] in TERMINAL:
         actions.append(
             ft.TextButton(
-                "Run again",
+                "Retry",
                 icon=ft.Icons.REPLAY,
                 on_click=app.retry_handler(task),
-                tooltip="Create a fresh task",
             )
         )
     assistant = ft.Container(
@@ -40,7 +37,6 @@ def messages(app, task: dict) -> list[ft.Control]:
                     [
                         ft.Icon(ft.Icons.AUTO_AWESOME, color=PRIMARY, size=18),
                         ft.Text("NEXORA", weight=ft.FontWeight.BOLD, size=12),
-                        badge(label(task["status"])),
                         ft.ProgressRing(
                             width=14,
                             height=14,
@@ -49,16 +45,12 @@ def messages(app, task: dict) -> list[ft.Control]:
                         ),
                     ]
                 ),
+                ft.Text(simple_status(task["status"]), color=PRIMARY, weight=ft.FontWeight.W_600),
                 ft.Markdown(
                     text,
                     selectable=True,
                     extension_set=ft.MarkdownExtensionSet.GITHUB_WEB,
                     on_tap_link=app.source_link,
-                ),
-                ft.Text(
-                    timestamp(task.get("ended_at") or task["created_at"]),
-                    size=10,
-                    color=colors["muted"],
                 ),
                 ft.Row(actions, wrap=True),
             ],

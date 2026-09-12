@@ -1,56 +1,63 @@
-# Windows PowerShell setup
+# Windows setup
 
-Already installed? Double-click **Open NEXORA.bat** in the project folder. It starts
-the backend, waits until it is ready, and opens the app. Keep the launcher window open.
-When the UI exits, the launcher stops only the backend it started itself.
+NEXORA supports Gemini AI for online chat and Mock AI for free offline testing. Chat
+history stays in the local SQLite database. Your Gemini key stays only in the ignored
+`.env` file on this computer.
 
-Use Python 3.11 or newer. Open PowerShell in the `nexora` project folder.
-These commands install only the Phase 1 dependencies and development checks.
+NEXORA resolves this `.env` from the application or launcher folder, so it works the same
+way from `Open NEXORA.bat`, PowerShell, Command Prompt, or a desktop shortcut. It does not
+use the terminal's current folder to find the key.
+
+## First setup
+
+Open PowerShell in the NEXORA project folder and run:
 
 ```powershell
 py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e '.[dev]'
+.\.venv\Scripts\python.exe -m pip install -e ".[dev,voice]"
 Copy-Item .env.example .env
 ```
 
-Copy `.env.example` only if you do not already have `.env`. Defaults use the free mock provider.
-No API key is needed. Put secrets only in local `.env` when a later phase supports them.
-Do not share `.env`, `data`, logs or the virtual environment.
+Create your own key in [Google AI Studio](https://aistudio.google.com/app/apikey). Never
+paste the key into chat. Open this local file in Notepad:
 
-Start the backend in the first terminal, from this project folder:
-
-```powershell
-.\.venv\Scripts\nexora-api.exe
+```text
+C:\Users\aj\Documents\Codex\2026-09-09\files-mentioned-by-the-user-nexora\outputs\nexora\.env
 ```
 
-Start the UI in a second terminal, from the same folder:
+Set these values:
 
-```powershell
-.\.venv\Scripts\nexora-ui.exe
+```dotenv
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=your_key_from_google_ai_studio
+GEMINI_MODEL=your_model_id_from_google_ai_studio
+DATABASE_URL=sqlite:///data/nexora.db
+NEXORA_SAFE_MODE=true
 ```
 
-Flet may download its desktop runtime on the first launch. After that, Phase 1 needs
-no internet. If that download is unavailable, the API and its local interactive docs
-at http://127.0.0.1:8000/docs can still be used.
+Save the file, close older NEXORA windows, then double-click `Open NEXORA.bat`.
 
-The backend creates `data/user_files` and `data/nexora.db` on startup. Put approved
-UTF-8 `.txt`, `.md`, `.csv`, `.json` or `.log` files in `data/user_files`.
-Try `calculate 2 + 3`, `list files`, or `approval demo`. Stop the servers with Ctrl+C.
+## Provider settings
 
-Check the backend and run quality checks:
+Open **More → Settings**. Choose **Gemini AI** or **Mock AI**, enter the Gemini model,
+and select **Save Settings**. **Test Gemini Connection** makes one small request and
+uses your available Gemini quota.
+
+Without a key, NEXORA explains that it is using Mock mode. Mock AI needs no key or
+internet and produces scripted responses for testing.
+
+## Voice
+
+Push-to-talk uses faster-whisper for speech recognition and pyttsx3 for playback. Audio
+is temporary and recording begins only after the microphone button is pressed. The first
+transcription can download the configured speech model.
+
+## Development checks
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8000/health
-.\.venv\Scripts\python.exe -m pytest
-.\.venv\Scripts\python.exe -m ruff check .
-.\.venv\Scripts\python.exe -m ruff format --check .
+.\.venv\Scripts\python.exe -m ruff check src tests
+.\.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider
+.\.venv\Scripts\python.exe -m pip check
 ```
 
-If Windows' `python` or `py` opens the Store or fails, use an installed Python executable's
-full path for the first command. No activation or PowerShell execution-policy change is needed.
-If pip hangs writing its cache in a restricted environment, set `$env:PIP_NO_CACHE_DIR='1'`
-and repeat the install command. This project was verified with a bundled Python 3.12 runtime.
-Use only one backend process; do not add `--workers` or expose the port outside loopback.
-
-Cloud, PDF, browser, voice and retrieval extras are defined in pyproject.toml but are not
-part of Phase 1. Installing them does not implement those features.
+Tests use fake Gemini and audio clients. They do not use a real key, internet, or quota.

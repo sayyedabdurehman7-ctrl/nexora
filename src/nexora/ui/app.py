@@ -2,7 +2,7 @@
 
 import flet as ft
 
-from nexora.ui.workspace import Workspace
+from nexora.ui.conversation_workspace import ConversationWorkspace as Workspace
 
 
 async def build(page: ft.Page) -> Workspace:

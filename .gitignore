@@ -12,3 +12,6 @@ logs/
 *.db-*
 dist/
 build/
+installer/output/
+work/
+*.spec

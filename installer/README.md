@@ -1,0 +1,11 @@
+# Build the Windows installer
+
+From the NEXORA project folder, run:
+
+```powershell
+.\installer\build.ps1
+```
+
+The script creates a portable package in `installer\output\NEXORA`. If Inno Setup is installed and `iscc.exe` is on PATH, it also creates `installer\output\NEXORA-Setup.exe`.
+
+If Inno Setup is not installed, use the portable folder or install Inno Setup, then run the build script again. The installer uses a per-user folder and does not require administrator access. It includes `.env.example`; copy it to `.env` in the installed NEXORA folder before adding your own settings.

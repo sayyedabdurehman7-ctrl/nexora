@@ -33,7 +33,7 @@ def test_config_validation():
     with pytest.raises(ValidationError):
         Settings(_env_file=None, max_tool_retries=-1)
     with pytest.raises(ValidationError):
-        Settings(_env_file=None, llm_provider="openai")
+        Settings(_env_file=None, llm_provider="unsupported")
     with pytest.raises(ValidationError):
         Settings(_env_file=None, nexora_safe_mode=False)
 

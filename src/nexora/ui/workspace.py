@@ -24,13 +24,12 @@ class Workspace:
         self.state.load_preferences()
         self.root = ft.Container(expand=True)
         self.goal = ft.TextField(
-            hint_text="Ask a question or give NEXORA a goal…",
+            hint_text="Ask NEXORA anything or give it a goal...",
             multiline=True,
             shift_enter=True,
-            min_lines=2,
-            max_lines=5,
+            min_lines=3,
+            max_lines=7,
             border=ft.InputBorder.NONE,
-            max_length=2000,
             on_submit=self.submit,
             text_size=self.text_size,
         )
@@ -78,54 +77,85 @@ class Workspace:
         self.page.dark_theme = ft.Theme(color_scheme_seed=PRIMARY, font_family="Segoe UI")
         width, height = self.page.width or 1400, self.page.height or 900
         compact = self.state.collapsed or width < 1050 or height < 680
+        modern = hasattr(self, "conversation")
+        screen = self.state.screen
         title = (
             self.state.task["user_text"][:45] if self.state.task and self.state.screen == "Chat" else self.state.screen
         )
-        top = ft.Row(
-            [
-                ft.Column(
-                    [
-                        ft.Text(
-                            title if title != "Chat" else "Your workspace",
-                            size=17,
-                            weight=ft.FontWeight.W_600,
-                            max_lines=1,
-                            overflow=ft.TextOverflow.ELLIPSIS,
-                        ),
-                        ft.Text("MOCK PROVIDER · LOCAL", size=9, color=colors["muted"]),
-                    ],
-                    expand=True,
+        if getattr(self, "conversation", None) and self.state.screen == "Chat":
+            title = self.conversation["title"][:45]
+        if modern:
+            more_items = [
+                ft.PopupMenuItem(
+                    content=ft.Text("Back to chat" if screen != "Chat" else "Settings"),
+                    icon=ft.Icons.CHAT_BUBBLE_OUTLINE if screen != "Chat" else ft.Icons.SETTINGS_OUTLINED,
+                    on_click=self.navigate_handler("Chat" if screen != "Chat" else "Settings"),
                 ),
-                badge("Safe Mode", "#268365") if width > 700 else ft.Icon(ft.Icons.SHIELD_OUTLINED, color="#268365"),
-                ft.Icon(
-                    ft.Icons.CIRCLE,
-                    size=8,
-                    color="#268365" if self.state.connected else "#D94B59",
-                    tooltip="Connected" if self.state.connected else "Backend offline",
+                ft.PopupMenuItem(
+                    content=ft.Text("Task history"),
+                    icon=ft.Icons.HISTORY,
+                    on_click=self.navigate_handler("Task history"),
                 ),
-                ft.IconButton(
-                    ft.Icons.DARK_MODE_OUTLINED,
-                    tooltip="Toggle light / dark theme",
+                ft.PopupMenuItem(
+                    content=ft.Text("Available tools"),
+                    icon=ft.Icons.GRID_VIEW_ROUNDED,
+                    on_click=self.navigate_handler("Tools"),
+                ),
+                ft.PopupMenuItem(
+                    content=ft.Text("Use dark theme" if not self.dark else "Use light theme"),
+                    icon=ft.Icons.DARK_MODE_OUTLINED if not self.dark else ft.Icons.LIGHT_MODE_OUTLINED,
                     on_click=self.toggle_theme,
                 ),
-                ft.IconButton(
-                    ft.Icons.VIEW_SIDEBAR_OUTLINED,
-                    tooltip="Show / hide task intelligence",
-                    on_click=self.toggle_panel,
+                ft.PopupMenuItem(content=ft.Text("Quick guide"), icon=ft.Icons.HELP_OUTLINE, on_click=self.help_dialog),
+                ft.PopupMenuItem(
+                    content=ft.Text("Retry connection"),
+                    icon=ft.Icons.REFRESH,
+                    on_click=self.reconnect,
                 ),
-                ft.PopupMenuButton(
-                    tooltip="More options",
-                    items=[
-                        ft.PopupMenuItem(content=ft.Text("Quick guide"), on_click=self.help_dialog),
-                        ft.PopupMenuItem(content=ft.Text("Refresh connection"), on_click=self.reconnect),
-                        ft.PopupMenuItem(content=ft.Text("Rename conversation · Coming Soon"), disabled=True),
-                        ft.PopupMenuItem(content=ft.Text("Delete conversation · Coming Soon"), disabled=True),
-                    ],
-                ),
-            ],
-            spacing=8,
-        )
-        screen = self.state.screen
+            ]
+            if getattr(self, "conversation", None):
+                more_items += [
+                    ft.PopupMenuItem(
+                        content=ft.Text("Rename chat"),
+                        icon=ft.Icons.EDIT_OUTLINED,
+                        on_click=self.rename_chat,
+                    ),
+                    ft.PopupMenuItem(
+                        content=ft.Text("Delete chat"),
+                        icon=ft.Icons.DELETE_OUTLINE,
+                        on_click=self.delete_chat,
+                    ),
+                ]
+            top = ft.Row(
+                [
+                    ft.Text(
+                        title if title != "Chat" else "New Chat",
+                        size=18,
+                        weight=ft.FontWeight.W_600,
+                        max_lines=1,
+                        overflow=ft.TextOverflow.ELLIPSIS,
+                        expand=True,
+                    ),
+                    ft.PopupMenuButton(icon=ft.Icons.MORE_HORIZ, tooltip="More", items=more_items),
+                ],
+                spacing=8,
+            )
+        else:
+            top = ft.Row(
+                [
+                    ft.Text(
+                        title if title != "Chat" else "Your workspace",
+                        size=17,
+                        weight=ft.FontWeight.W_600,
+                        max_lines=1,
+                        overflow=ft.TextOverflow.ELLIPSIS,
+                        expand=True,
+                    ),
+                    badge("Safe Mode", "#268365"),
+                    ft.IconButton(ft.Icons.DARK_MODE_OUTLINED, tooltip="Toggle theme", on_click=self.toggle_theme),
+                    ft.IconButton(ft.Icons.VIEW_SIDEBAR_OUTLINED, tooltip="Show plan", on_click=self.toggle_panel),
+                ]
+            )
         if screen == "Chat":
             body = chat(self)
         elif screen == "Task history":
@@ -144,8 +174,10 @@ class Workspace:
                 ft.Container(
                     ft.Row(
                         [
-                            ft.Text(self.error, expand=True, color="#B4404A", size=12),
-                            ft.TextButton("Reconnect", on_click=self.reconnect),
+                            ft.Icon(ft.Icons.ERROR_OUTLINE, color="#B4404A"),
+                            ft.Text(self.error, expand=True, color="#B4404A", size=13),
+                            ft.TextButton("View Details", on_click=self.show_error_details),
+                            ft.TextButton("Retry", on_click=self.reconnect),
                         ]
                     ),
                     padding=10,
@@ -154,7 +186,14 @@ class Workspace:
                 )
             )
         if self.state.busy:
-            center_controls.append(ft.ProgressBar(color=PRIMARY))
+            center_controls.append(
+                ft.Row(
+                    [
+                        ft.ProgressRing(width=16, height=16, stroke_width=2, color=PRIMARY),
+                        ft.Text("NEXORA is thinking…", size=13, color=colors["muted"]),
+                    ]
+                )
+            )
         center_controls.append(body)
         middle = ft.Container(
             ft.Column(center_controls, expand=True, spacing=12),
@@ -195,7 +234,7 @@ class Workspace:
         self.state.busy = False
         self.render()
         if self.state.connected:
-            self.notify("Connected to the local mock provider.")
+            self.notify("NEXORA is connected.")
 
     def notify(self, text: str) -> None:
         self.page.show_dialog(ft.SnackBar(ft.Text(text)))
@@ -319,6 +358,68 @@ class Workspace:
                 self.show_panel_dialog()
 
         return select
+
+    async def open_plan(self, e=None) -> None:
+        self.state.plan_expanded = True
+        if (self.page.width or 1400) < 1250:
+            self.show_panel_dialog()
+        else:
+            self.state.panel_open = True
+            self.render()
+
+    async def toggle_plan_steps(self, e=None) -> None:
+        self.state.plan_expanded = not self.state.plan_expanded
+        self.render()
+
+    def decision_handler(self, approve: bool):
+        async def decide(e=None):
+            task = self.state.task
+            approval = task.get("approval") if task else None
+            if approval and approval.get("status") == "pending":
+                await self.decide(approval["id"], approve, task["id"])
+
+        return decide
+
+    async def show_error_details(self, e=None) -> None:
+        connection = "Connected" if self.state.connected else "Not connected"
+        self.page.show_dialog(
+            ft.AlertDialog(
+                title=ft.Text("Technical details"),
+                content=ft.Text(
+                    f"App connection: {connection}\n"
+                    "No private message content or API keys are shown here.",
+                    selectable=True,
+                ),
+                actions=[ft.TextButton("Close", on_click=lambda e: self.page.pop_dialog())],
+            )
+        )
+
+    async def show_task_details(self, e=None) -> None:
+        task = self.state.task
+        if not task:
+            return
+        from nexora.ui.state import duration, simple_status
+
+        details = [
+            ft.Text(simple_status(task["status"]), weight=ft.FontWeight.W_600),
+            ft.Text(f"Time: {duration(task)}"),
+            ft.Divider(),
+            ft.Text("Activity", weight=ft.FontWeight.W_600),
+        ]
+        details += [ft.Text(event["message"], size=13) for event in self.state.events[-12:]]
+        if not self.state.events:
+            details.append(ft.Text("No activity details yet."))
+        self.page.show_dialog(
+            ft.AlertDialog(
+                title=ft.Text("Task details"),
+                content=ft.Container(
+                    ft.Column(details, scroll=ft.ScrollMode.AUTO),
+                    width=440,
+                    height=min(430, (self.page.height or 800) - 220),
+                ),
+                actions=[ft.TextButton("Close", on_click=lambda e: self.page.pop_dialog())],
+            )
+        )
 
     def show_panel_dialog(self) -> None:
         self.page.show_dialog(
@@ -450,9 +551,9 @@ class Workspace:
                                 size=18,
                                 weight=ft.FontWeight.W_600,
                             ),
-                            ft.Text("Mock runs local commands. General chat is coming soon."),
-                            badge("1 · Mock selected · free and local"),
-                            ft.Row([coming("OpenAI"), coming("Ollama")], wrap=True),
+                            ft.Text("NEXORA can run approved local commands safely."),
+                            badge("1 · Safe local mode available"),
+                            coming("Online AI setup"),
                             ft.Text("2 · Approved workspace", weight=ft.FontWeight.W_600),
                             ft.Text(
                                 self.state.settings.get("workspace", "Connect to load this setting."),

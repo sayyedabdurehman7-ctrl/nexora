@@ -31,13 +31,59 @@ def sidebar(app, compact: bool) -> ft.Control:
         ft.IconButton(ft.Icons.ADD, tooltip="New Task", on_click=app.new_task)
         if compact
         else ft.Button(
-            "New Task",
+            "New Chat",
             icon=ft.Icons.ADD,
             on_click=app.new_task,
             width=220,
             tooltip="Start a fresh goal",
         ),
     ]
+    if hasattr(app, "conversation"):
+        if not compact:
+            controls += [
+                ft.Divider(color=colors["border"]),
+                ft.Text("Recent chats", size=13, color=colors["muted"], weight=ft.FontWeight.W_600),
+            ]
+            recent = [
+                ft.Container(
+                    ft.TextButton(
+                        c["title"][:25],
+                        tooltip=c["title"],
+                        on_click=app.chat_handler(c["id"]),
+                        width=218,
+                        style=ft.ButtonStyle(alignment=ft.Alignment.CENTER_LEFT),
+                    ),
+                    border_radius=10,
+                    bgcolor=(
+                        colors["accent"]
+                        if getattr(app, "conversation", None) and app.conversation["id"] == c["id"]
+                        else None
+                    ),
+                )
+                for c in app.conversations[:30]
+            ]
+            controls.append(
+                ft.Column(
+                    recent or [ft.Text("Your chats will appear here.", size=13, color=colors["muted"])],
+                    expand=True,
+                    scroll=ft.ScrollMode.AUTO,
+                )
+            )
+        else:
+            controls.append(ft.Container(expand=True))
+        controls.append(
+            ft.IconButton(
+                ft.Icons.MENU_OPEN,
+                tooltip="Expand sidebar" if compact else "Collapse sidebar",
+                on_click=app.toggle_sidebar,
+            )
+        )
+        return ft.Container(
+            ft.Column(controls, spacing=10, expand=True),
+            width=72 if compact else 250,
+            padding=14,
+            bgcolor=colors["sidebar"],
+        )
     for name, icon in NAV:
         controls.append(
             ft.Container(
@@ -53,7 +99,7 @@ def sidebar(app, compact: bool) -> ft.Control:
             ft.Divider(color=colors["border"]),
             ft.Text("RECENT CONVERSATIONS", size=10, color=colors["muted"]),
             ft.TextField(
-                hint_text="Search conversations",
+                hint_text="Search chats",
                 prefix_icon=ft.Icons.SEARCH,
                 value=state.search,
                 dense=True,
@@ -61,7 +107,7 @@ def sidebar(app, compact: bool) -> ft.Control:
             ),
         ]
         recent = []
-        for task in state.filtered_tasks()[:20]:
+        for task in [] if hasattr(app, "conversations") else state.filtered_tasks()[:20]:
             active = state.task and state.task["id"] == task["id"]
             recent.append(
                 ft.Container(
@@ -85,6 +131,12 @@ def sidebar(app, compact: bool) -> ft.Control:
                     bgcolor=colors["accent"] if active else None,
                 )
             )
+        if hasattr(app, "conversations"):
+            recent = [
+                ft.TextButton(c["title"][:32], tooltip=c["title"], on_click=app.chat_handler(c["id"]))
+                for c in app.conversations
+                if state.search.lower() in c["title"].lower()
+            ][:20]
         controls.append(
             ft.Column(
                 recent or [ft.Text("Your tasks will appear here.", size=12, color=colors["muted"])],
