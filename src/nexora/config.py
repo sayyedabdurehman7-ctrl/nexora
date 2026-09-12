@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore", hide_input_in_errors=True)
 
     nexora_env: str = "development"
+    nexora_build_profile: Literal["developer", "tester", "production"] = "developer"
     nexora_safe_mode: bool = True
     llm_provider: Literal["gemini", "mock"] = "mock"
     gemini_api_key: SecretStr = SecretStr("")
@@ -88,6 +89,13 @@ class Settings(BaseSettings):
             raise ValueError("Phase 1 requires NEXORA_SAFE_MODE=true")
         if not self.database_url.startswith("sqlite:///"):
             raise ValueError("DATABASE_URL must use local sqlite:///")
+        # A tester package is a deterministic, keyless evaluation build.  Provider
+        # configuration remains a developer/deployment concern and is never read
+        # from a tester's machine.
+        if self.nexora_build_profile == "tester":
+            self.llm_provider = "mock"
+            self.gemini_api_key = SecretStr("")
+            self.gemini_model = ""
         return self
 
 

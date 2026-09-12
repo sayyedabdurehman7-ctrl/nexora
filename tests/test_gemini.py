@@ -132,6 +132,33 @@ async def test_gemini_connected_status():
     }
 
 
+@pytest.mark.asyncio
+async def test_gemini_empty_response_is_normalized():
+    provider = GeminiProvider("fake-key", "fake-model", fake_client(FakeModels([])))
+    with pytest.raises(ProviderError, match="returned no text"):
+        _ = [part async for part in provider.stream_chat([{"role": "user", "content": "hi"}])]
+
+
+@pytest.mark.asyncio
+async def test_gemini_network_timeout_retries_once():
+    class RetryModels(FakeModels):
+        def __init__(self):
+            super().__init__(["Recovered"])
+            self.calls = 0
+
+        async def generate_content_stream(self, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                raise TimeoutError("network timeout")
+            return await super().generate_content_stream(**kwargs)
+
+    models = RetryModels()
+    provider = GeminiProvider("fake-key", "fake-model", fake_client(models))
+    result = "".join([part async for part in provider.stream_chat([{"role": "user", "content": "hi"}])])
+    assert result == "Recovered"
+    assert models.calls == 2
+
+
 def test_absolute_env_loading_and_key_cleanup(tmp_path, monkeypatch):
     app_dir = tmp_path / "application"
     app_dir.mkdir()

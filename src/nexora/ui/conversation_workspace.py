@@ -55,20 +55,21 @@ class ConversationWorkspace(Workspace):
         await super().refresh()
         if self.state.connected:
             try:
-                desired = self.state.preferences.get("provider") or self.state.settings.get("provider")
-                desired_model = self.state.preferences.get("gemini_model") or self.state.settings.get(
-                    "gemini_model", ""
-                )
-                if self.state.settings.get("provider") and (
-                    self.state.settings["provider"] != desired
-                    or self.state.settings.get("gemini_model", "") != desired_model
-                ):
-                    selected = await self.client.request(
-                        "PATCH",
-                        "/api/v1/settings/provider",
-                        json={"provider": desired, "gemini_model": desired_model},
+                if self.state.settings.get("build_profile", "developer") == "developer":
+                    desired = self.state.preferences.get("provider") or self.state.settings.get("provider")
+                    desired_model = self.state.preferences.get("gemini_model") or self.state.settings.get(
+                        "gemini_model", ""
                     )
-                    self.state.settings.update(selected)
+                    if self.state.settings.get("provider") and (
+                        self.state.settings["provider"] != desired
+                        or self.state.settings.get("gemini_model", "") != desired_model
+                    ):
+                        selected = await self.client.request(
+                            "PATCH",
+                            "/api/v1/settings/provider",
+                            json={"provider": desired, "gemini_model": desired_model},
+                        )
+                        self.state.settings.update(selected)
                 desired_voice_mode = self.state.preferences.get("voice_mode", "push_to_talk")
                 desired_voice_enabled = bool(self.state.preferences.get("assistant_voice_enabled", False))
                 desired_wake_phrase = self.state.preferences.get("wake_phrase", "Hey NEXORA")
@@ -96,12 +97,14 @@ class ConversationWorkspace(Workspace):
                 self.voice_mode = desired_voice_enabled
                 self.conversations = await self.client.request("GET", "/api/v1/conversations")
             except (httpx.HTTPError, KeyError, ValueError):
-                self.state.connected = False
-                self.error = "NEXORA cannot connect. Restart NEXORA and try again."
+                self.connection_failed()
 
     async def submit(self, e=None):
         text = (self.goal.value or "").strip()
         if not text or self.state.busy:
+            return
+        if not self.state.connected:
+            self.notify("NEXORA is reconnecting. Your message is still here.")
             return
         self.editing = False
         self.state.busy = True
@@ -173,10 +176,13 @@ class ConversationWorkspace(Workspace):
         return open_chat
 
     async def voice_action(self, action):
+        if not self.state.connected and action != "cancel":
+            self.notify("NEXORA is reconnecting. Voice controls will return when it is ready.")
+            return
         try:
             self.voice = await self.client.request("POST", f"/api/v1/voice/{action}")
         except Exception:
-            self.error = "Voice control failed. Check the backend connection."
+            self.error = "Voice control failed. Wait for NEXORA to reconnect and try again."
         self.render()
 
     async def microphone(self, e=None):
@@ -398,6 +404,40 @@ class ConversationWorkspace(Workspace):
             self.error = "Feedback could not be saved. Try again."
             self.render()
 
+    async def export_data(self, e=None):
+        try:
+            result = await self.client.request("POST", "/api/v1/data/export")
+            self.notify(f"Your data was saved as {result['filename']} in the NEXORA exports folder.")
+        except Exception:
+            self.error = "Your data could not be exported. Try again."
+            self.render()
+
+    async def confirm_clear_data(self, e=None):
+        async def clear(event=None):
+            try:
+                await self.client.request("DELETE", "/api/v1/data")
+                self.page.pop_dialog()
+                self.conversation = None
+                self.conversations = []
+                self.state.task = None
+                await self.refresh()
+                self.notify("Local chats, tasks, and memory were cleared.")
+            except Exception:
+                self.error = "Local data could not be cleared. Try again."
+            self.render()
+
+        self.page.show_dialog(
+            ft.AlertDialog(
+                modal=True,
+                title=ft.Text("Clear local NEXORA data?"),
+                content=ft.Text("This removes saved chats, tasks, and memory from this computer."),
+                actions=[
+                    ft.TextButton("Cancel", on_click=lambda event: self.page.pop_dialog()),
+                    ft.Button("Clear local data", on_click=clear),
+                ],
+            )
+        )
+
     def speak_handler(self, message_id):
         async def speak(e=None):
             try:
@@ -540,9 +580,17 @@ class ConversationWorkspace(Workspace):
             await asyncio.sleep(0.75)
             if self.state.busy:
                 continue
+            if self.connection_state == "Recovery failed":
+                continue
             try:
                 await self.sync_chat()
                 self.voice = await self.client.request("GET", "/api/v1/voice")
+                recovered = not self.state.connected
+                self.state.connected = True
+                self.connection_state = "Connected"
+                self.connection_failures = 0
+                if recovered:
+                    await self.refresh()
                 transcript = self.voice.get("transcript", "")
                 if transcript and transcript != self.transcript_seen and not self.editing:
                     self.goal.value = transcript
@@ -564,4 +612,8 @@ class ConversationWorkspace(Workspace):
                     self.render()
                     last_snapshot = snapshot
             except Exception:
-                self.error = "Connection lost. Reconnect to continue."
+                previous = self.connection_state
+                self.connection_failed()
+                if not self.editing and previous != self.connection_state:
+                    self.render()
+                await asyncio.sleep(min(4.0, 0.25 * (2 ** min(self.connection_failures, 4))))

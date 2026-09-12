@@ -2,10 +2,15 @@
 
 import asyncio
 import json
+import os
+import platform
+from datetime import UTC, datetime
+from pathlib import Path
 
 import flet as ft
 import httpx
 
+from nexora.diagnostics import sanitize
 from nexora.ui.client import APIClient
 from nexora.ui.components.approval_dialog import approval_dialog
 from nexora.ui.components.sidebar import sidebar
@@ -17,6 +22,7 @@ from nexora.ui.pages.history import history
 from nexora.ui.pages.settings import settings
 from nexora.ui.state import TERMINAL, UIState
 from nexora.ui.theme import PRIMARY, badge, coming, palette
+from nexora.version import APP_VERSION
 
 
 class Workspace:
@@ -40,6 +46,8 @@ class Workspace:
         self.shown_approvals: set[str] = set()
         self.disconnected = False
         self.error = ""
+        self.connection_state = "Starting"
+        self.connection_failures = 0
 
     @property
     def text_size(self) -> int:
@@ -161,7 +169,9 @@ class Workspace:
                         overflow=ft.TextOverflow.ELLIPSIS,
                         expand=True,
                     ),
-                    badge("Safe Mode", "#268365"),
+                    badge("Demo mode", "#268365")
+                    if self.state.settings.get("demo_mode", True)
+                    else ft.Container(),
                     ft.IconButton(ft.Icons.DARK_MODE_OUTLINED, tooltip="Toggle theme", on_click=self.toggle_theme),
                     ft.IconButton(ft.Icons.VIEW_SIDEBAR_OUTLINED, tooltip="Show plan", on_click=self.toggle_panel),
                 ]
@@ -183,6 +193,61 @@ class Workspace:
         else:
             body = unavailable(self, screen)
         center_controls = [top, ft.Divider(color=colors["border"])]
+        if not self.state.connected:
+            labels = {
+                "Starting": "NEXORA is starting…",
+                "Reconnecting": "NEXORA is reconnecting…",
+                "Offline": "NEXORA is temporarily offline",
+                "Recovery failed": "NEXORA could not restore its connection",
+            }
+            actions = []
+            if self.connection_state in {"Offline", "Recovery failed"}:
+                actions = [
+                    ft.TextButton("Try Again", on_click=self.reconnect),
+                    ft.TextButton("Restart NEXORA Service", on_click=self.restart_service),
+                    ft.PopupMenuButton(
+                        icon=ft.Icons.MORE_HORIZ,
+                        tooltip="Connection help",
+                        items=[
+                            ft.PopupMenuItem(
+                                content=ft.Text("Copy Diagnostic Report"),
+                                icon=ft.Icons.COPY_OUTLINED,
+                                on_click=self.copy_diagnostic_report,
+                            ),
+                            ft.PopupMenuItem(
+                                content=ft.Text("Open Logs"),
+                                icon=ft.Icons.FOLDER_OPEN_OUTLINED,
+                                on_click=self.open_logs,
+                            ),
+                        ],
+                    ),
+                ]
+            center_controls.append(
+                ft.Container(
+                    ft.Row(
+                        [
+                            ft.ProgressRing(
+                                width=15,
+                                height=15,
+                                stroke_width=2,
+                                visible=self.connection_state in {"Starting", "Reconnecting"},
+                            ),
+                            ft.Icon(
+                                ft.Icons.CLOUD_OFF_OUTLINED,
+                                visible=self.connection_state in {"Offline", "Recovery failed"},
+                            ),
+                            ft.Text(labels.get(self.connection_state, "NEXORA is reconnecting…"), expand=True),
+                            *actions,
+                        ],
+                        wrap=True,
+                    ),
+                    key="connection-status",
+                    padding=10,
+                    bgcolor=colors["surface"],
+                    border=ft.Border.all(1, colors["border"]),
+                    border_radius=10,
+                )
+            )
         if self.error:
             center_controls.append(
                 ft.Container(
@@ -255,11 +320,19 @@ class Workspace:
             )
             self.state.tasks, self.state.tools, self.state.settings = tasks, registry, config
             self.state.connected, self.error = True, ""
+            self.connection_state = "Connected"
+            self.connection_failures = 0
         except (httpx.HTTPError, ValueError):
-            self.state.connected = False
-            self.error = "NEXORA cannot connect to its local service. Try again or restart NEXORA."
+            self.connection_failed()
+
+    def connection_failed(self) -> None:
+        self.state.connected = False
+        self.connection_failures += 1
+        self.connection_state = "Reconnecting" if self.connection_failures <= 4 else "Recovery failed"
 
     async def reconnect(self, e=None) -> None:
+        self.connection_state = "Starting"
+        self.connection_failures = 0
         self.state.busy = True
         self.render()
         await self.refresh()
@@ -268,11 +341,58 @@ class Workspace:
         if self.state.connected:
             self.notify("NEXORA is connected.")
 
+    def diagnostic_report(self) -> str:
+        data_root = Path(os.getenv("NEXORA_DATA_DIR", ".")).resolve()
+        tails = []
+        for name in ("nexora.log", "backend.log"):
+            path = data_root / "logs" / name
+            try:
+                tails.append(path.read_text(encoding="utf-8", errors="replace")[-8000:])
+            except OSError:
+                continue
+        safe_log = sanitize("\n".join(tails)).replace(str(Path.home()), "%USERPROFILE%")
+        return (
+            "NEXORA Diagnostic Report\n"
+            f"Created: {datetime.now(UTC).isoformat()}\n"
+            f"Version: {APP_VERSION}\n"
+            f"Build profile: {self.state.settings.get('build_profile', 'unknown')}\n"
+            f"Windows: {platform.platform()}\n"
+            f"Connection state: {self.connection_state}\n\n"
+            "Recent safe diagnostics:\n"
+            f"{safe_log or 'No diagnostic entries are available.'}"
+        )
+
+    async def copy_diagnostic_report(self, e=None) -> None:
+        try:
+            await ft.Clipboard().set(self.diagnostic_report())
+            self.notify("Diagnostic report copied.")
+        except Exception:
+            self.notify("The diagnostic report could not be copied. Use Open Logs instead.")
+
+    async def open_logs(self, e=None) -> None:
+        folder = Path(os.getenv("NEXORA_DATA_DIR", ".")).resolve() / "logs"
+        folder.mkdir(parents=True, exist_ok=True)
+        if hasattr(os, "startfile"):
+            os.startfile(folder)  # type: ignore[attr-defined]
+
+    async def restart_service(self, e=None) -> None:
+        data_root = Path(os.getenv("NEXORA_DATA_DIR", ".")).resolve()
+        data_root.mkdir(parents=True, exist_ok=True)
+        (data_root / "restart-service.request").write_text(
+            datetime.now(UTC).isoformat(), encoding="utf-8"
+        )
+        self.connection_state = "Reconnecting"
+        self.connection_failures = 0
+        self.render()
+
     def notify(self, text: str) -> None:
         self.page.show_dialog(ft.SnackBar(ft.Text(text)))
 
     async def submit(self, e=None) -> None:
         text = (self.goal.value or "").strip()
+        if not self.state.connected:
+            self.notify("NEXORA is reconnecting. Your message is still here.")
+            return
         if self.state.busy or not text:
             if not text:
                 self.notify("Enter a goal first. Try: calculate 2 + 3")
@@ -352,7 +472,7 @@ class Workspace:
                 self.state.screen = "Chat"
                 await self.load_task(task_id)
             except (httpx.HTTPError, ValueError):
-                self.error = "Could not load this task. Check the backend connection."
+                self.error = "Could not load this task. Check the NEXORA connection."
             self.render()
 
         return open_task
@@ -634,6 +754,5 @@ class Workspace:
                 last = snapshot
             except (httpx.HTTPError, ValueError):
                 if self.state.connected:
-                    self.state.connected = False
-                    self.error = "Connection lost. Reconnect to check task status."
+                    self.connection_failed()
                     self.render()

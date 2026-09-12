@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from nexora.config import data_dir
+
 TERMINAL = {"COMPLETED", "FAILED", "BLOCKED", "CANCELLED", "TIMED_OUT"}
 LABELS = {
     "RECEIVED": "Received",
@@ -116,7 +118,7 @@ class UIState:
             "welcomed": False,
         }
     )
-    preference_path: Path | None = Path("data/ui_preferences.json")
+    preference_path: Path | None = data_dir() / "data" / "ui_preferences.json"
 
     def load_preferences(self) -> None:
         try:

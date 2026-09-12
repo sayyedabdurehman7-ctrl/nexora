@@ -23,12 +23,13 @@ class TextToSpeechProvider(Protocol):
 
 
 async def worker(mode: str, args: list[str], payload: bytes, timeout: float = 180) -> bytes:
+    command = (
+        [sys.executable, "speech-worker", mode, *args]
+        if getattr(sys, "frozen", False)
+        else [sys.executable, "-m", "nexora.speech_worker", mode, *args]
+    )
     process = await asyncio.create_subprocess_exec(
-        sys.executable,
-        "-m",
-        "nexora.speech_worker",
-        mode,
-        *args,
+        *command,
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,

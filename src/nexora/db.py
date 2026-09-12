@@ -149,6 +149,15 @@ class Store:
                 raise KeyError(memory_id)
             session.delete(row)
 
+    def clear_user_data(self) -> None:
+        """Remove chats, tasks, audit history, and memory after explicit UI confirmation."""
+        table_names = ("audit_events", "conversations", "tasks", "memories")
+        with self.engine.begin() as connection:
+            for name in table_names:
+                table = Base.metadata.tables.get(name)
+                if table is not None:
+                    connection.execute(table.delete())
+
     @staticmethod
     def _memory_dict(row: MemoryRecord) -> dict:
         return {

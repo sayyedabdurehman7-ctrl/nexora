@@ -1,7 +1,10 @@
 """Local-only FastAPI adapter. Business logic lives in Service."""
 
+import json
 import os
+import sys
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import Literal
 from uuid import uuid4
 
@@ -16,6 +19,8 @@ from nexora.config import Settings, gemini_key_diagnostic, load_settings
 from nexora.conversations import ConversationService
 from nexora.core import Conflict, Service
 from nexora.db import Store
+from nexora.diagnostics import configure as configure_diagnostics
+from nexora.diagnostics import safe_exception_category, safe_traceback
 from nexora.feedback import FeedbackInput, save_feedback
 from nexora.identity import normalize_creator_website
 from nexora.models import GoalInput
@@ -25,9 +30,11 @@ from nexora.voice import VoiceService
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
+    config = settings or load_settings()
+    diagnostic_log = configure_diagnostics(config.nexora_data_dir, config.nexora_build_profile)
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        config = settings or load_settings()
         store = Store(config.database_url)
         stored_website = store.get_setting("creator_website")
         if stored_website is not None:
@@ -37,6 +44,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.service = service
         app.state.chat = ConversationService(service)
         app.state.voice = VoiceService(config)
+        diagnostic_log.info("profile=%s stage=ready database=ready", config.nexora_build_profile)
         yield
         await app.state.voice.cancel()
         await app.state.chat.close()
@@ -94,27 +102,37 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(Exception)
     async def unexpected(request, exc):
+        diagnostic_log.error(
+            "profile=%s stage=request category=%s correlation_id=%s traceback=%s",
+            config.nexora_build_profile,
+            safe_exception_category(exc),
+            request.state.correlation_id,
+            safe_traceback(exc),
+        )
         return error(request, 500, "INTERNAL_ERROR", "An internal error occurred.")
 
     @app.get("/health")
     async def health(request: Request):
         config = request.app.state.service.settings
-        return {
+        status = {
             "status": "ok",
             "version": APP_VERSION,
-            "provider": config.llm_provider,
-            "provider_status": "demo" if config.llm_provider == "mock" else "configured",
+            "build_profile": config.nexora_build_profile,
+            "mode": "demo" if config.llm_provider == "mock" else "online",
             "safe_mode": config.nexora_safe_mode,
         }
+        if config.nexora_build_profile == "developer":
+            status["provider"] = config.llm_provider
+        return status
 
     @app.get("/api/v1/settings")
     async def public_settings(request: Request):
         config = request.app.state.service.settings
         # Explicit allowlist: never serialize the settings object or secret fields.
-        return {
-            "provider": config.llm_provider,
-            "gemini_key_status": "Configured" if config.gemini_api_key.get_secret_value() else "Not Configured",
-            "gemini_model": config.gemini_model,
+        result = {
+            "build_profile": config.nexora_build_profile,
+            "connection_status": "NEXORA is ready",
+            "demo_mode": config.llm_provider == "mock",
             "creator_website": config.creator_website,
             "voice_mode": config.voice_mode,
             "assistant_voice_enabled": config.assistant_voice_enabled,
@@ -125,34 +143,49 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "max_task_seconds": config.max_task_seconds,
             "workspace": str(config.nexora_workspace_dir.resolve()),
         }
+        if config.nexora_build_profile == "developer":
+            result.update(
+                provider=config.llm_provider,
+                gemini_key_status=(
+                    "Configured" if config.gemini_api_key.get_secret_value() else "Not Configured"
+                ),
+                gemini_model=config.gemini_model,
+            )
+        return result
 
-    @app.get("/api/v1/settings/gemini/diagnostic")
-    async def gemini_diagnostic(request: Request):
-        config = request.app.state.service.settings
-        return {"message": gemini_key_diagnostic(config)}
+    if config.nexora_build_profile == "developer":
 
-    class ProviderInput(BaseModel):
-        provider: Literal["gemini", "mock"]
-        gemini_model: str | None = Field(default=None, max_length=100)
+        @app.get("/api/v1/settings/gemini/diagnostic")
+        async def gemini_diagnostic(request: Request):
+            active = request.app.state.service.settings
+            return {"message": gemini_key_diagnostic(active)}
 
-    @app.patch("/api/v1/settings/provider")
-    async def select_provider(body: ProviderInput, request: Request):
-        selected = request.app.state.chat.select_provider(body.provider, body.gemini_model)
-        config = request.app.state.service.settings
-        return {
-            "provider": selected,
-            "gemini_model": config.gemini_model,
-            "gemini_key_status": "Configured" if config.gemini_api_key.get_secret_value() else "Not Configured",
-        }
+        class ProviderInput(BaseModel):
+            provider: Literal["gemini", "mock"]
+            gemini_model: str | None = Field(default=None, max_length=100)
 
-    class GeminiTestInput(BaseModel):
-        model: str = Field(default="", max_length=100)
+        @app.patch("/api/v1/settings/provider")
+        async def select_provider(body: ProviderInput, request: Request):
+            selected = request.app.state.chat.select_provider(body.provider, body.gemini_model)
+            active = request.app.state.service.settings
+            return {
+                "provider": selected,
+                "gemini_model": active.gemini_model,
+                "gemini_key_status": (
+                    "Configured" if active.gemini_api_key.get_secret_value() else "Not Configured"
+                ),
+            }
 
-    @app.post("/api/v1/settings/gemini/test")
-    async def test_gemini(body: GeminiTestInput, request: Request):
-        config = request.app.state.service.settings
-        provider = GeminiProvider(config.gemini_api_key.get_secret_value(), body.model.strip() or config.gemini_model)
-        return await provider.test_connection()
+        class GeminiTestInput(BaseModel):
+            model: str = Field(default="", max_length=100)
+
+        @app.post("/api/v1/settings/gemini/test")
+        async def test_gemini(body: GeminiTestInput, request: Request):
+            active = request.app.state.service.settings
+            provider = GeminiProvider(
+                active.gemini_api_key.get_secret_value(), body.model.strip() or active.gemini_model
+            )
+            return await provider.test_connection()
 
     class AboutSettingsInput(BaseModel):
         creator_website: str = Field(default="", max_length=500)
@@ -173,6 +206,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def tester_feedback(body: FeedbackInput, request: Request):
         config = request.app.state.service.settings
         return {"saved": True, "filename": save_feedback(config.nexora_data_dir, body)}
+
+    @app.post("/api/v1/data/export")
+    async def export_local_data(request: Request):
+        service = request.app.state.service
+        chat_store = request.app.state.chat.store
+        chats = [chat_store.get(item["id"]).model_dump(mode="json") for item in chat_store.list()]
+        payload = {
+            "exported_at": datetime.now(UTC).isoformat(),
+            "version": APP_VERSION,
+            "conversations": chats,
+            "tasks": [task.model_dump(mode="json") for task in service.store.list()],
+            "memory": service.store.memory_list(include_disabled=True),
+        }
+        folder = config.nexora_data_dir / "exports"
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / f"NEXORA-Export-{datetime.now(UTC):%Y%m%d-%H%M%S}.json"
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        return {"saved": True, "filename": path.name}
+
+    @app.delete("/api/v1/data", status_code=204)
+    async def clear_local_data(request: Request):
+        await request.app.state.chat.close()
+        request.app.state.service.store.clear_user_data()
 
     @app.post("/api/v1/tasks", status_code=201)
     async def create_goal(body: GoalInput, request: Request):
@@ -244,6 +300,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "speech-worker":
+        from nexora.speech_worker import main as speech_worker_main
+
+        sys.argv = [sys.argv[0], *sys.argv[2:]]
+        speech_worker_main()
+        return
     uvicorn.run(
         create_app(),
         host=os.getenv("HOST", "127.0.0.1"),

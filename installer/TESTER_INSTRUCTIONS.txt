@@ -1,8 +1,13 @@
-NEXORA TESTER INSTRUCTIONS
+NEXORA v0.3.0 TESTER INSTRUCTIONS
 
 1. Install NEXORA.
-2. Open it from the desktop shortcut.
+2. Open it from the NEXORA desktop or Start Menu shortcut. Keep only one NEXORA window open.
 3. Try chat, voice, modes, and settings.
 4. Use Feedback if something is confusing or broken.
 
 NEXORA starts in Demo mode. No API key, Python, Git, or development software is required.
+
+If NEXORA temporarily loses its connection, wait while it reconnects. If recovery fails,
+choose Try Again or Restart NEXORA Service. Use Copy Diagnostic Report to share a safe report.
+
+Your chats and feedback are stored under your Windows Local AppData NEXORA folder.

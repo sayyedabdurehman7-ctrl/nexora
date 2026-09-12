@@ -1,13 +1,19 @@
 param([switch]$RecoveryTest)
 
 $ErrorActionPreference = 'Stop'
-$appVersion = '0.2.0'
+$appVersion = '0.3.0'
 $appDir = $PSScriptRoot
+$profileFile = Join-Path $appDir 'build-profile.txt'
+$buildProfile = if (Test-Path -LiteralPath $profileFile) {
+    (Get-Content -LiteralPath $profileFile -Raw).Trim().ToLowerInvariant()
+} else { 'tester' }
+if ($buildProfile -notin @('developer', 'tester', 'production')) { $buildProfile = 'tester' }
 $dataRoot = Join-Path $env:LOCALAPPDATA 'NEXORA'
 $logFolder = Join-Path $dataRoot 'logs'
 $logFile = Join-Path $logFolder 'nexora.log'
 $tempStdout = Join-Path $logFolder 'backend-output.tmp'
 $tempStderr = Join-Path $logFolder 'backend-error.tmp'
+$restartSignal = Join-Path $dataRoot 'restart-service.request'
 $backend = Join-Path $appDir 'backend\NexoraBackend.exe'
 $ui = Join-Path $appDir 'NEXORA.exe'
 $script:startupStage = 'launcher initialization'
@@ -15,20 +21,31 @@ $script:ownedBackend = $null
 $script:instanceMutex = $null
 
 New-Item -ItemType Directory -Force -Path $logFolder, (Join-Path $dataRoot 'data'), `
-    (Join-Path $dataRoot 'data\user_files'), (Join-Path $dataRoot 'feedback') | Out-Null
+    (Join-Path $dataRoot 'data\user_files'), (Join-Path $dataRoot 'feedback'), `
+    (Join-Path $dataRoot 'exports') | Out-Null
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+$OutputEncoding = [Text.UTF8Encoding]::new($false)
 
 function Protect-DiagnosticText([string]$Text) {
     if (!$Text) { return '' }
     $safe = $Text -replace '(?i)(GEMINI_API_KEY|api[_ -]?key|authorization|token|password)\s*[:=]\s*\S+', '$1=[redacted]'
-    return $safe -replace '\b(?:sk|AIza)[A-Za-z0-9_-]{12,}\b', '[redacted]'
+    $safe = $safe -replace '\b(?:sk|AIza)[A-Za-z0-9_-]{12,}\b', '[redacted]'
+    $userProfile = [Environment]::GetFolderPath('UserProfile')
+    if ($userProfile) { $safe = $safe.Replace($userProfile, '%USERPROFILE%') }
+    if ($env:LOCALAPPDATA) { $safe = $safe.Replace($env:LOCALAPPDATA, '%LOCALAPPDATA%') }
+    return $safe
 }
 
 function Write-NexoraLog([string]$Stage, [string]$Message, [string]$Details = '') {
+    if ((Test-Path -LiteralPath $logFile) -and (Get-Item -LiteralPath $logFile).Length -gt 2097152) {
+        $archive = Join-Path $logFolder 'nexora.previous.log'
+        Move-Item -LiteralPath $logFile -Destination $archive -Force
+    }
     $timestamp = [DateTime]::UtcNow.ToString('o')
     $windows = [Environment]::OSVersion.VersionString
     $safeMessage = Protect-DiagnosticText $Message
     $safeDetails = Protect-DiagnosticText $Details
-    $entry = "[$timestamp] version=$appVersion windows=`"$windows`" stage=`"$Stage`" message=`"$safeMessage`""
+    $entry = "[$timestamp] version=$appVersion profile=$buildProfile windows=`"$windows`" stage=`"$Stage`" message=`"$safeMessage`""
     if ($safeDetails) { $entry += "`r`n$safeDetails" }
     Add-Content -LiteralPath $logFile -Value $entry -Encoding UTF8
 }
@@ -40,6 +57,7 @@ function Get-ErrorReport([string]$Failure) {
     return Protect-DiagnosticText @"
 NEXORA Error Report
 Version: $appVersion
+Build profile: $buildProfile
 Windows: $([Environment]::OSVersion.VersionString)
 Startup stage: $script:startupStage
 Problem: $Failure
@@ -102,8 +120,34 @@ function Get-BackendError {
 function Test-NexoraHealth([int]$Port) {
     try {
         $health = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 2
-        return $health.status -eq 'ok' -and $health.version -eq $appVersion -and $health.safe_mode
+        return $health.status -eq 'ok' -and $health.version -eq $appVersion -and `
+            $health.build_profile -eq $buildProfile -and $health.safe_mode
     } catch { return $false }
+}
+
+function Stop-OwnedBackend {
+    if ($null -ne $script:ownedBackend -and !$script:ownedBackend.HasExited) {
+        Stop-Process -Id $script:ownedBackend.Id -ErrorAction SilentlyContinue
+        $script:ownedBackend.WaitForExit(3000) | Out-Null
+    }
+    $script:ownedBackend = $null
+}
+
+function Start-ManagedBackend([int]$Port) {
+    $env:PORT = [string]$Port
+    $env:NEXORA_API_URL = "http://127.0.0.1:$Port"
+    Remove-Item -LiteralPath $tempStdout, $tempStderr -Force -ErrorAction SilentlyContinue
+    $script:ownedBackend = Start-Process -FilePath $backend -WorkingDirectory $appDir -WindowStyle Hidden `
+        -RedirectStandardOutput $tempStdout -RedirectStandardError $tempStderr -PassThru
+    for ($attempt = 0; $attempt -lt 60; $attempt++) {
+        if ($script:ownedBackend.HasExited) {
+            $exitCode = $script:ownedBackend.ExitCode
+            throw "The local service stopped during startup (exit code $exitCode).`r`n$(Get-BackendError)"
+        }
+        if (Test-NexoraHealth $Port) { return }
+        Start-Sleep -Milliseconds 250
+    }
+    throw "The local service did not become ready in time.`r`n$(Get-BackendError)"
 }
 
 function Start-NexoraSession {
@@ -117,48 +161,89 @@ function Start-NexoraSession {
     }
     $env:NEXORA_APP_DIR = $appDir
     $env:NEXORA_DATA_DIR = $dataRoot
+    $env:NEXORA_BUILD_PROFILE = $buildProfile
+    if ($buildProfile -eq 'tester') {
+        $env:LLM_PROVIDER = 'mock'
+        $env:GEMINI_API_KEY = ''
+        $env:GEMINI_MODEL = ''
+    }
     $databasePath = (Join-Path $dataRoot 'data\nexora.db').Replace('\', '/')
     $env:DATABASE_URL = "sqlite:///$databasePath"
     $env:NEXORA_WORKSPACE_DIR = Join-Path $dataRoot 'data\user_files'
-    $port = Get-FreeLoopbackPort
-    $env:PORT = [string]$port
-    $env:NEXORA_API_URL = "http://127.0.0.1:$port"
-    Remove-Item -LiteralPath $tempStdout, $tempStderr -Force -ErrorAction SilentlyContinue
-
     try {
         $script:startupStage = 'starting local service'
-        Write-NexoraLog $script:startupStage "Starting on loopback port $port."
-        $script:ownedBackend = Start-Process -FilePath $backend -WorkingDirectory $appDir -WindowStyle Hidden `
-            -RedirectStandardOutput $tempStdout -RedirectStandardError $tempStderr -PassThru
         $ready = $false
-        for ($attempt = 0; $attempt -lt 60; $attempt++) {
-            if ($script:ownedBackend.HasExited) {
-                throw "The local service stopped during startup.`r`n$(Get-BackendError)"
+        for ($startAttempt = 1; $startAttempt -le 3; $startAttempt++) {
+            $port = Get-FreeLoopbackPort
+            Write-NexoraLog $script:startupStage "Starting on loopback port $port (attempt $startAttempt of 3)."
+            try {
+                Start-ManagedBackend $port
+                $ready = $true
+                break
+            } catch {
+                Write-NexoraLog $script:startupStage 'Local service start attempt failed.' (Get-BackendError)
+                Stop-OwnedBackend
             }
-            if (Test-NexoraHealth $port) { $ready = $true; break }
-            Start-Sleep -Milliseconds 250
         }
-        if (!$ready) { throw "The local service did not become ready in time.`r`n$(Get-BackendError)" }
+        if (!$ready) { throw "The local service did not become ready after three attempts.`r`n$(Get-BackendError)" }
 
         $script:startupStage = 'opening desktop interface'
         Write-NexoraLog $script:startupStage 'Local service health check passed.'
-        & $ui
-        if ($LASTEXITCODE -is [int] -and $LASTEXITCODE -ne 0) {
-            throw 'The desktop interface closed with an error.'
+        $uiProcess = Start-Process -FilePath $ui -WorkingDirectory $appDir -PassThru
+        $healthFailures = 0
+        $restartAttempts = 0
+        $recoveryExhausted = $false
+        while (!$uiProcess.HasExited) {
+            Start-Sleep -Milliseconds 750
+            $manualRestart = Test-Path -LiteralPath $restartSignal
+            if ($manualRestart) {
+                Remove-Item -LiteralPath $restartSignal -Force -ErrorAction SilentlyContinue
+                $restartAttempts = 0
+                $recoveryExhausted = $false
+                $healthFailures = 3
+                Write-NexoraLog 'runtime recovery' 'The user requested a local service restart.'
+            } elseif (!$recoveryExhausted -and (
+                $null -eq $script:ownedBackend -or $script:ownedBackend.HasExited -or !(Test-NexoraHealth $port)
+            )) {
+                $healthFailures++
+            } else {
+                if (!$recoveryExhausted -and $healthFailures -gt 0) {
+                    Write-NexoraLog 'runtime health' 'Local service connection recovered.'
+                }
+                if (!$recoveryExhausted) { $healthFailures = 0 }
+            }
+
+            if ($healthFailures -ge 3 -and $restartAttempts -lt 3) {
+                $restartAttempts++
+                $exitDetails = Get-BackendError
+                Write-NexoraLog 'runtime recovery' "Restarting local service (attempt $restartAttempts of 3)." $exitDetails
+                Stop-OwnedBackend
+                try {
+                    Start-ManagedBackend $port
+                    $healthFailures = 0
+                    $recoveryExhausted = $false
+                } catch {
+                    Write-NexoraLog 'runtime recovery' 'Local service restart failed.' (Get-BackendError)
+                    Stop-OwnedBackend
+                }
+            } elseif ($healthFailures -ge 3 -and $restartAttempts -ge 3) {
+                Write-NexoraLog 'runtime recovery failed' 'Automatic recovery reached its retry limit.' (Get-BackendError)
+                $healthFailures = 0
+                $recoveryExhausted = $true
+            }
+        }
+        if ($uiProcess.ExitCode -ne 0) {
+            throw "The desktop interface closed with exit code $($uiProcess.ExitCode)."
         }
         Write-NexoraLog 'shutdown' 'NEXORA closed normally.'
     } finally {
-        if ($null -ne $script:ownedBackend -and !$script:ownedBackend.HasExited) {
-            Stop-Process -Id $script:ownedBackend.Id -ErrorAction SilentlyContinue
-            $script:ownedBackend.WaitForExit(3000) | Out-Null
-        }
-        $script:ownedBackend = $null
+        Stop-OwnedBackend
         Remove-Item -LiteralPath $tempStdout, $tempStderr -Force -ErrorAction SilentlyContinue
     }
 }
 
 try {
-    $script:instanceMutex = New-Object Threading.Mutex($false, 'Local\NEXORA-Desktop-v020')
+    $script:instanceMutex = New-Object Threading.Mutex($false, "Local\NEXORA-Desktop-v030-$buildProfile")
     if (!$script:instanceMutex.WaitOne(0)) {
         Add-Type -AssemblyName PresentationFramework
         [Windows.MessageBox]::Show('NEXORA is already open.', 'NEXORA', 'OK', 'Information') | Out-Null

@@ -5,6 +5,7 @@ from nexora.ui.theme import PRIMARY, card
 
 def settings(app) -> ft.Control:
     values, colors = app.state.settings, app.colors
+    developer = values.get("build_profile", "developer") == "developer"
     feedback_values = getattr(
         app,
         "feedback_values",
@@ -43,8 +44,82 @@ def settings(app) -> ft.Control:
     )
     content = ft.Column(
         [
-            ft.Text("AI Settings", size=28, weight=ft.FontWeight.W_600),
-            ft.Text("Choose the AI used for new replies.", color=colors["muted"]),
+            ft.Text("Settings", size=28, weight=ft.FontWeight.W_600),
+            card(
+                ft.Row(
+                    [
+                        ft.Icon(ft.Icons.CHECK_CIRCLE_OUTLINE, color="#268365"),
+                        ft.Column(
+                            [
+                                ft.Text(
+                                    values.get("connection_status", "NEXORA is ready"),
+                                    weight=ft.FontWeight.W_600,
+                                ),
+                                ft.Text(
+                                    "Demo mode" if values.get("demo_mode", True) else "Online mode",
+                                    size=12,
+                                    color=colors["muted"],
+                                ),
+                            ],
+                            spacing=2,
+                        ),
+                    ]
+                ),
+                colors,
+            ),
+            ft.Text("Appearance", size=20, weight=ft.FontWeight.W_600),
+            card(
+                ft.Row(
+                    [
+                        ft.Text("Choose the look that is comfortable for you.", expand=True),
+                        ft.Button(
+                            "Use light theme" if app.dark else "Use dark theme",
+                            icon=ft.Icons.LIGHT_MODE_OUTLINED if app.dark else ft.Icons.DARK_MODE_OUTLINED,
+                            on_click=app.toggle_theme,
+                        ),
+                    ],
+                    wrap=True,
+                ),
+                colors,
+            ),
+            ft.Text("Language and privacy", size=20, weight=ft.FontWeight.W_600),
+            card(
+                ft.Column(
+                    [
+                        ft.Text("Language: System default"),
+                        ft.Text("Your chats, memory, and feedback stay on this computer."),
+                        ft.Text("Notifications: Coming Soon", color=colors["muted"]),
+                        ft.Row(
+                            [
+                                ft.Button(
+                                    "Manage Memory",
+                                    icon=ft.Icons.BOOKMARK_BORDER,
+                                    on_click=app.navigate_handler("Memory"),
+                                ),
+                                ft.Button(
+                                    "Export my data",
+                                    icon=ft.Icons.DOWNLOAD_OUTLINED,
+                                    on_click=getattr(app, "export_data", None),
+                                ),
+                                ft.TextButton(
+                                    "Clear local data",
+                                    icon=ft.Icons.DELETE_OUTLINE,
+                                    on_click=getattr(app, "confirm_clear_data", None),
+                                ),
+                            ],
+                            wrap=True,
+                        ),
+                    ],
+                    spacing=12,
+                ),
+                colors,
+            ),
+            ft.Text("AI Settings", size=24, weight=ft.FontWeight.W_600, visible=developer),
+            ft.Text(
+                "Choose the AI used for new replies.",
+                color=colors["muted"],
+                visible=developer,
+            ),
             card(
                 ft.Column(
                     [
@@ -104,6 +179,7 @@ def settings(app) -> ft.Control:
                     spacing=18,
                 ),
                 colors,
+                visible=developer,
             ),
             ft.Text("Tester Feedback", size=24, weight=ft.FontWeight.W_600),
             ft.Text(
@@ -277,6 +353,7 @@ def settings(app) -> ft.Control:
                     spacing=12,
                 ),
                 colors,
+                visible=developer,
             ),
         ],
         spacing=18,

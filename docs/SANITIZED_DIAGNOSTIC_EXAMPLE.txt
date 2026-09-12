@@ -1,0 +1,12 @@
+NEXORA Error Report
+Version: 0.3.0
+Build profile: tester
+Windows: Microsoft Windows NT 10.0
+Startup stage: runtime recovery
+Problem: The local service could not be restored.
+
+Recent diagnostic log:
+[UTC timestamp] version=0.3.0 profile=tester stage="runtime recovery" message="Restarting local service (attempt 1 of 3)."
+[UTC timestamp] version=0.3.0 profile=tester stage="runtime health" message="Local service connection recovered."
+
+API keys, tokens, private message text, and unnecessary user-profile paths are excluded or redacted.

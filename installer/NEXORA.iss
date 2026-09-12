@@ -1,5 +1,5 @@
 #define AppName "NEXORA"
-#define AppVersion "0.2.0"
+#define AppVersion "0.3.0"
 #define AppPublisher "NEXORA"
 
 [Setup]
@@ -12,7 +12,7 @@ VersionInfoDescription=NEXORA Windows Installer
 DefaultDirName={localappdata}\Programs\NEXORA
 DefaultGroupName=NEXORA
 OutputDir=output
-OutputBaseFilename=NEXORA-Setup-v{#AppVersion}
+OutputBaseFilename=NEXORA-Setup-v{#AppVersion}-Tester
 Compression=lzma2
 SolidCompression=yes
 PrivilegesRequired=lowest

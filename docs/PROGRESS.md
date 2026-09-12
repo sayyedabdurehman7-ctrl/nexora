@@ -1,5 +1,15 @@
 # Progress
 
+## Stable tester release and connection recovery — 2026-09-12
+
+- Added explicit `developer`, `tester`, and `production` build profiles. Tester mode forces deterministic Demo/Mock operation, removes provider/model/key data from public settings, and does not register developer-only configuration routes.
+- Fixed the installed-launcher race that stopped the healthy backend immediately after opening the native Flet window. The launcher now waits for the real UI process, monitors backend health, performs three bounded restarts, accepts a user-requested restart signal, and closes its child backend when the UI exits.
+- Added Starting, Connected, Reconnecting, Offline, and Recovery failed UI states with one compact status surface. Unsent input and the current conversation remain in the UI during recovery.
+- Added UTF-8-safe rotating diagnostics with version, build profile, Windows/Python version, startup stage, safe exception category, correlation ID, stack locations, backend exit code, and health transitions. Secrets and message contents are excluded.
+- Tester Settings now contains normal appearance, voice, language/privacy, memory, local export/clear, About, feedback, and basic connection controls. AI provider and model controls remain developer-only.
+- Updated Windows CI to supported Python 3.11 and 3.12. Added tests for 20 Demo messages, English, Urdu, Hindi, emoji, long input, profile boundaries, unsupported model/parameter, timeout retry, invalid response, export, and clear.
+- Verification before packaging: Ruff passed; **124 passed, 1 skipped**. See `docs/TESTER_RELEASE_v0.3.0.md` for the evidence and clean-machine limitations.
+
 ## Professional black workspace redesign — 2026-09-12
 
 - Added the white `assets/NEXORA_Wordmark_White.svg` brand wordmark and removed the old blue-square mark from the chat experience.
@@ -161,3 +171,13 @@ exora.web_app:app to serve FastAPI and Flet together for a hosted service.
 - Added a local tester feedback form with five rating levels, confusion/error/liked-feature/next-feature fields, optional sanitized diagnostics, clipboard copy, and JSON file export. No login or network is required.
 - Added `TESTER_INSTRUCTIONS.txt` and `CHANGELOG-v0.2.0.txt`. The new installer includes desktop and Start Menu shortcuts, Readme, tester instructions, and an uninstall entry.
 - Packaged backend smoke test passed from the installed folder: `/health` returned `status=ok`, `version=0.2.0`, `provider_status=demo`, and `safe_mode=true`. Recovery-window smoke test exited successfully. Final offline verification: **117 passed, 1 skipped**; Ruff passed.
+
+## Stable tester release v0.3.0 — 2026-09-12
+
+- Corrected the desktop launcher lifecycle so it waits for the actual UI process and keeps its owned local backend alive until the user closes NEXORA.
+- Added managed startup on a free loopback port, version/profile health validation, bounded automatic backend recovery, one compact UI connection state, and privacy-safe rotating diagnostics.
+- Added developer, tester, and production build profiles. Tester mode is locked to deterministic Demo mode; provider, model, key, connection-test controls, and their API routes are absent.
+- Preserved chats and unsent input during recovery, added confirmed data clearing and local export, and kept user data under `%LOCALAPPDATA%\NEXORA` across uninstall/reinstall.
+- Fixed the backend package layout and removed a duplicate Flet runtime that exceeded normal Windows installer path limits. The packaged backend includes `python312.dll` and starts without a system Python command.
+- Final verification: Ruff passed; **124 tests passed, 1 skipped**; packaged `/health` passed; clean-folder install, backend crash recovery, reopen/history persistence, uninstall, reinstall, secret scan, and removed-provider search passed.
+- Built `installer/output/NEXORA-Setup-v0.3.0-Tester.exe` (142.42 MiB), SHA-256 `FAF27B6252916498867B80EE162AC5F680FE06467AC0111A59441B1BC65A261D`.

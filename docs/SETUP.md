@@ -42,11 +42,11 @@ NEXORA_SAFE_MODE=true
 
 Save the file, close older NEXORA windows, then double-click `Open NEXORA.bat`.
 
-## Provider settings
+## Provider settings (developer build only)
 
 Open **More → Settings**. Choose **Gemini AI** or **Mock AI**, enter the Gemini model,
 and select **Save Settings**. **Test Gemini Connection** makes one small request and
-uses your available Gemini quota.
+uses your available Gemini quota. These controls are not included in Tester or Production settings.
 
 Without a key, NEXORA explains that it is using Mock mode. Mock AI needs no key or
 internet and produces scripted responses for testing.

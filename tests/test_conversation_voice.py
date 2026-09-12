@@ -12,7 +12,7 @@ from nexora.voice import VoiceService
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("focused,expected_renders", [(True, 0), (False, 1)])
+@pytest.mark.parametrize("focused,expected_renders", [(True, 0), (False, 2)])
 async def test_poll_preserves_typing(monkeypatch, focused, expected_renders):
     from types import SimpleNamespace
     from unittest.mock import Mock
@@ -61,7 +61,7 @@ async def test_old_backend_shows_recoverable_error():
     ui = ConversationWorkspace(PageStub(), client=OldBackend(), state=UIState(preference_path=None))
     await ui.start()
     assert not ui.state.connected
-    assert "restart" in ui.error.lower()
+    assert ui.connection_state == "Reconnecting"
     assert ui.root.content is not None
 
 

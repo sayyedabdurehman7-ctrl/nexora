@@ -10,6 +10,8 @@ __pycache__/
 .packaged-test/
 .install-test/
 .install-test2/
+.test-tmp-v030/
+.install-test-v030/
 .ruff_cache/
 data/
 logs/

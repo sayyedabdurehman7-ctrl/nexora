@@ -32,6 +32,7 @@ class LLMProvider(Protocol):
     def classify_goal(self, goal: str) -> RequestType: ...
     def create_plan(self, goal: str) -> list[PlanStep]: ...
     def stream_chat(self, messages: list[dict], answer_mode: AnswerMode = "medium") -> AsyncIterator[str]: ...
+    async def health_check(self) -> dict: ...
 
 
 class ProviderError(RuntimeError):
@@ -49,6 +50,9 @@ class FallbackProvider:
 
     def create_plan(self, goal: str) -> list[PlanStep]:
         return MockLLMProvider().create_plan(goal)
+
+    async def health_check(self) -> dict:
+        return await self.primary.health_check()
 
     async def stream_chat(self, messages: list[dict], answer_mode: AnswerMode = "medium") -> AsyncIterator[str]:
         try:
@@ -68,6 +72,9 @@ class FallbackProvider:
 
 
 class MockLLMProvider:
+    async def health_check(self) -> dict:
+        return {"status": "Connected", "mode": "demo"}
+
     async def stream_chat(self, messages: list[dict], answer_mode: AnswerMode = "medium") -> AsyncIterator[str]:
         goal = messages[-1]["content"]
         lowered = goal.lower()
@@ -201,7 +208,14 @@ class GeminiProvider(MockLLMProvider):
     """Google Gen AI SDK adapter for multi-turn streaming text chat."""
 
     def __init__(self, api_key: str, model: str, client=None):
-        self._api_key, self.model, self._client = api_key, model, client
+        self._api_key, self.model, self._client = api_key, self.validate_model(model), client
+
+    @staticmethod
+    def validate_model(model: str) -> str:
+        value = (model or "").strip()
+        if value and (len(value) > 100 or not re.fullmatch(r"[A-Za-z0-9._:/-]+", value)):
+            raise ProviderError("Invalid model", "The configured model name is invalid.")
+        return value
 
     async def stream_chat(self, messages: list[dict], answer_mode: AnswerMode = "medium") -> AsyncIterator[str]:
         if not self._api_key:
@@ -221,15 +235,26 @@ class GeminiProvider(MockLLMProvider):
             for message in messages
         ]
         try:
-            stream = await client.aio.models.generate_content_stream(
-                model=self.model,
-                contents=contents,
-                config={
-                    "system_instruction": NEXORA_IDENTITY_POLICY
-                    + "\n\nResponse style for this message: "
-                    + MODE_INSTRUCTIONS[answer_mode]
-                },
-            )
+            stream = None
+            for attempt in range(2):
+                try:
+                    stream = await client.aio.models.generate_content_stream(
+                        model=self.model,
+                        contents=contents,
+                        config={
+                            "system_instruction": NEXORA_IDENTITY_POLICY
+                            + "\n\nResponse style for this message: "
+                            + MODE_INSTRUCTIONS[answer_mode]
+                        },
+                    )
+                    break
+                except Exception as exc:
+                    mapped = self.map_error(exc)
+                    if mapped.status != "Offline" or attempt == 1:
+                        raise mapped from None
+                    await asyncio.sleep(0.25)
+            if stream is None:
+                raise ProviderError("Provider error", "NEXORA could not complete that request. Please try again.")
             found_text = False
             async for chunk in stream:
                 text = getattr(chunk, "text", "") or ""
@@ -261,6 +286,9 @@ class GeminiProvider(MockLLMProvider):
         except ProviderError as exc:
             return {"status": exc.status, "message": str(exc)}
 
+    async def health_check(self) -> dict:
+        return await self.test_connection()
+
     @staticmethod
     def map_error(exc: Exception) -> ProviderError:
         code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
@@ -271,6 +299,8 @@ class GeminiProvider(MockLLMProvider):
             )
         if code == 404 or "not found" in text or "model" in text and "invalid" in text:
             return ProviderError("Provider error", "The Gemini model is invalid or unavailable. Check GEMINI_MODEL.")
+        if code == 400 and any(word in text for word in ("unsupported", "unknown field", "unexpected keyword")):
+            return ProviderError("Provider error", "The selected AI service does not support this request option.")
         if any(word in text for word in ("connect", "network", "offline", "timed out", "timeout")):
             return ProviderError("Offline", "Gemini could not be reached. Check your internet connection.")
         if code in (400, 401, 403) or "api key" in text:

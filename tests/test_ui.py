@@ -130,12 +130,15 @@ async def test_offline_state():
 
     ui = Workspace(PageStub(), client=Offline(), state=UIState(preference_path=None))
     await ui.start()
-    assert not ui.state.connected and "local service" in ui.error
+    assert not ui.state.connected and ui.connection_state == "Reconnecting"
 
 
 async def test_public_settings_never_exposes_keys(workspace):
     ui, _ = workspace
     assert set(ui.state.settings) == {
+        "build_profile",
+        "connection_status",
+        "demo_mode",
         "provider",
         "gemini_key_status",
         "gemini_model",

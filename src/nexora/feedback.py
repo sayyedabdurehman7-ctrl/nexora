@@ -55,8 +55,12 @@ def save_feedback(data_dir: Path, feedback: FeedbackInput) -> str:
     payload["created_at"] = datetime.now(UTC).isoformat()
     payload["shareable_text"] = format_feedback(feedback)
     if feedback.attach_diagnostic:
-        log_path = data_dir.resolve() / "logs" / "nexora.log"
-        diagnostic = log_path.read_text(encoding="utf-8", errors="replace")[-20000:] if log_path.exists() else ""
-        payload["diagnostic_report"] = _SECRET.sub("[redacted]", diagnostic)
+        diagnostics = []
+        for name in ("nexora.log", "nexora-backend.log"):
+            log_path = data_dir.resolve() / "logs" / name
+            if log_path.exists():
+                diagnostics.append(log_path.read_text(encoding="utf-8", errors="replace")[-10000:])
+        diagnostic = _SECRET.sub("[redacted]", "\n".join(diagnostics))
+        payload["diagnostic_report"] = diagnostic.replace(str(Path.home()), "%USERPROFILE%")
     (folder / filename).write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
     return filename

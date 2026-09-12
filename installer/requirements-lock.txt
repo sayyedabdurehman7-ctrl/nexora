@@ -1,0 +1,14 @@
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.5
+pydantic-settings==2.15.0
+sqlalchemy==2.0.52
+httpx==0.28.1
+python-dotenv==1.2.3
+flet==0.86.5
+google-genai==1.75.0
+sounddevice==0.5.6
+faster-whisper==1.2.1
+pyttsx3==2.99
+pyinstaller==6.22.2
+certifi==2026.7.22

@@ -1,0 +1,11 @@
+NEXORA v0.3.0 Tester
+
+- Fixed the launcher race that stopped the backend immediately after the desktop window opened.
+- Added managed backend monitoring and bounded automatic recovery.
+- Added Starting, Connected, Reconnecting, Offline, and Recovery failed connection states.
+- Added a small stable connection status with retry, service restart, and safe diagnostic actions.
+- Added explicit Developer, Tester, and Production build profiles.
+- Removed provider, model, API-key, backend URL, port, and SDK controls from Tester settings.
+- Tester builds always start in deterministic Demo mode and require no API key.
+- Added UTF-8-safe logs and data handling for English, Urdu, Hindi, and emoji text.
+- Added local data export, confirmed local-data clearing, and rotating privacy-safe diagnostics.
